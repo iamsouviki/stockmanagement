@@ -1,0 +1,115 @@
+"use client";
+
+import type { BillItem } from '@/types';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Trash2, MinusCircle, PlusCircle } from 'lucide-react';
+import Image from 'next/image';
+import { Package } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+
+interface BillItemsListProps {
+  items: BillItem[];
+  onRemoveItem: (itemId: string) => void;
+  onUpdateQuantity: (itemId: string, newQuantity: number) => void;
+}
+
+const BillItemsList: React.FC<BillItemsListProps> = ({ items, onRemoveItem, onUpdateQuantity }) => {
+  
+  const handleQuantityChange = (itemId: string, currentQuantity: number, change: number) => {
+    const newQuantity = Math.max(1, currentQuantity + change); // Quantity cannot be less than 1
+    onUpdateQuantity(itemId, newQuantity);
+  };
+
+  return (
+    <Card className="shadow-md">
+      <CardHeader>
+        <CardTitle className="text-xl text-primary">Current Bill Items</CardTitle>
+        <CardDescription>Review items added to the bill before finalizing.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ScrollArea className="w-full whitespace-nowrap rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[60px]">Image</TableHead>
+                <TableHead>Product</TableHead>
+                <TableHead className="text-right">Price</TableHead>
+                <TableHead className="text-center w-[150px]">Quantity</TableHead>
+                <TableHead className="text-right">Subtotal</TableHead>
+                <TableHead className="text-center w-[80px]">Remove</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    No items added to the bill yet.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                items.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell>
+                       {item.imageUrl ? (
+                        <Image
+                          src={item.imageUrl}
+                          alt={item.name}
+                          width={40}
+                          height={40}
+                          className="rounded-md object-cover"
+                          data-ai-hint={item.imageHint || "product item"}
+                        />
+                      ) : (
+                        <div className="w-10 h-10 bg-secondary rounded-md flex items-center justify-center">
+                          <Package className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-medium">{item.name}</TableCell>
+                    <TableCell className="text-right">${item.price.toFixed(2)}</TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center space-x-2">
+                        <Button variant="ghost" size="icon" onClick={() => handleQuantityChange(item.id, item.billQuantity, -1)} disabled={item.billQuantity <= 1}>
+                          <MinusCircle className="h-5 w-5" />
+                        </Button>
+                        <Input 
+                          type="number" 
+                          value={item.billQuantity} 
+                          onChange={(e) => onUpdateQuantity(item.id, Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-16 text-center h-9"
+                          min="1"
+                        />
+                        <Button variant="ghost" size="icon" onClick={() => handleQuantityChange(item.id, item.billQuantity, 1)}>
+                          <PlusCircle className="h-5 w-5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">${(item.price * item.billQuantity).toFixed(2)}</TableCell>
+                    <TableCell className="text-center">
+                      <Button variant="ghost" size="icon" onClick={() => onRemoveItem(item.id)} title="Remove Item">
+                        <Trash2 className="h-4 w-4 text-red-600" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        <ScrollBar orientation="horizontal" />
+        </ScrollArea>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default BillItemsList;
