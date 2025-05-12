@@ -19,3 +19,13 @@ export interface Product {
 export interface BillItem extends Product {
   billQuantity: number;
 }
+
+export interface Customer {
+  id: string;
+  name: string;
+  mobileNumber: string;
+  email?: string;
+  address?: string;
+  imageUrl?: string;
+  imageHint?: string;
+}

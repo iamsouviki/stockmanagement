@@ -1,5 +1,5 @@
-import type { Category, Product } from '@/types';
-import { Smartphone, Laptop, Tv2, Headphones, Printer, HardDrive } from 'lucide-react';
+import type { Category, Product, Customer } from '@/types';
+import { Smartphone, Laptop, Tv2, Headphones, Printer, HardDrive, Users } from 'lucide-react';
 
 export const mockCategories: Category[] = [
   { id: 'cat1', name: 'Smartphones' },
@@ -76,3 +76,48 @@ export const mockProducts: Product[] = [
     imageHint: 'laser printer',
   },
 ];
+
+export const mockCustomers: Customer[] = [
+  {
+    id: 'cust1',
+    name: 'Alice Wonderland',
+    mobileNumber: '555-0101',
+    email: 'alice@example.com',
+    address: '123 Main St, Anytown, USA',
+    imageUrl: 'https://picsum.photos/seed/alice/200/200',
+    imageHint: 'person avatar',
+  },
+  {
+    id: 'cust2',
+    name: 'Bob The Builder',
+    mobileNumber: '555-0102',
+    email: 'bob@example.com',
+    address: '456 Oak Ave, Anytown, USA',
+    imageUrl: 'https://picsum.photos/seed/bob/200/200',
+    imageHint: 'person avatar',
+  },
+  {
+    id: 'cust3',
+    name: 'Charlie Brown',
+    mobileNumber: '555-0103',
+    email: 'charlie@example.com',
+    address: '789 Pine Ln, Anytown, USA',
+  },
+   {
+    id: 'cust4',
+    name: 'Diana Prince',
+    mobileNumber: '555-0104',
+    address: '101 Amazon Cir, Themyscira',
+    imageUrl: 'https://picsum.photos/seed/diana/200/200',
+    imageHint: 'person avatar',
+  },
+  {
+    id: 'cust5',
+    name: 'Edward Elric',
+    mobileNumber: '555-0105',
+    email: 'fullmetal@example.com',
+  }
+];
+
+// Export Users icon for direct use if needed, or rely on string names for NavItem
+export { Users as UsersIcon };

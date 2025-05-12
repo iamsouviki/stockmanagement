@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Boxes, Receipt, ArrowRight } from 'lucide-react';
+import { Boxes, Receipt, ArrowRight, Users } from 'lucide-react';
 
 export default function DashboardPage() {
   return (
@@ -13,7 +13,7 @@ export default function DashboardPage() {
         </p>
       </section>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="shadow-lg hover:shadow-xl transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-2xl font-semibold">Manage Products</CardTitle>
@@ -47,6 +47,23 @@ export default function DashboardPage() {
             </Button>
           </CardContent>
         </Card>
+
+        <Card className="shadow-lg hover:shadow-xl transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-2xl font-semibold">Manage Customers</CardTitle>
+            <Users className="h-8 w-8 text-accent" />
+          </CardHeader>
+          <CardContent>
+            <CardDescription className="mb-4">
+              View, add, and update customer information. Search by mobile number.
+            </CardDescription>
+            <Button asChild variant="default" className="bg-primary hover:bg-primary/90">
+              <Link href="/customers">
+                Go to Customers <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
 
       <section className="mt-12 p-6 bg-card rounded-lg shadow">
@@ -55,6 +72,7 @@ export default function DashboardPage() {
           <li><span className="font-medium text-foreground">Barcode Scanning Mockup:</span> Simulate quick product identification.</li>
           <li><span className="font-medium text-foreground">Manual Serial Number Entry:</span> Easily add or edit product details.</li>
           <li><span className="font-medium text-foreground">Simple Bill Generation:</span> Create customer bills efficiently.</li>
+          <li><span className="font-medium text-foreground">Customer Management:</span> Keep track of your customer base.</li>
           <li><span className="font-medium text-foreground">Clean & Professional UI:</span> Modern design for ease of use.</li>
         </ul>
       </section>
