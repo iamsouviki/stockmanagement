@@ -336,7 +336,7 @@ export default function BillingPageContent() {
       }
       const itemSubtotal = item.price * item.billQuantity;
       doc.text(item.name, headX[0], yPos, { maxWidth: headX[1] - headX[0] - 5 });
-      doc.text(item.serialNumber || item.barcode, headX[1], yPos, { maxWidth: headX[2] - headX[1] - 5 });
+      doc.text(item.serialNumber || item.barcode || 'N/A', headX[1], yPos, { maxWidth: headX[2] - headX[1] - 5 });
       doc.text(item.billQuantity.toString(), headX[2], yPos, { align: 'right' });
       doc.text(`₹${item.price.toFixed(2)}`, headX[3], yPos, { align: 'right' });
       doc.text(`₹${itemSubtotal.toFixed(2)}`, headX[4] + 30, yPos, { align: 'right' });
@@ -393,16 +393,16 @@ export default function BillingPageContent() {
       name: item.name,
       price: item.price,
       billQuantity: item.billQuantity,
-      imageUrl: item.imageUrl,
-      imageHint: item.imageHint,
-      serialNumber: item.serialNumber,
-      barcode: item.barcode,
+      imageUrl: item.imageUrl || null,
+      imageHint: item.imageHint || null,
+      serialNumber: item.serialNumber || null,
+      barcode: item.barcode || null,
     }));
 
     const orderData: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'> = {
-      customerId: selectedCustomer?.id,
-      customerName: selectedCustomer?.name,
-      customerMobile: selectedCustomer?.mobileNumber,
+      customerId: selectedCustomer?.id || null,
+      customerName: selectedCustomer?.name || null,
+      customerMobile: selectedCustomer?.mobileNumber || null,
       items: orderItems,
       subtotal,
       taxAmount,
