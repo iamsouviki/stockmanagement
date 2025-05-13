@@ -15,7 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
 import { Package } from 'lucide-react';
 import jsPDF from 'jspdf';
-import { storeDetails } from '@/config/storeDetails'; // For PDF generation
+import { storeDetails } from '@/config/storeDetails';
 
 export default function OrderDetailPage() {
   const params = useParams();
@@ -36,7 +36,7 @@ export default function OrderDetailPage() {
             setOrder(fetchedOrder);
           } else {
             toast({ title: "Error", description: "Order not found.", variant: "destructive" });
-            router.push('/orders'); // Redirect if order not found
+            router.push('/orders');
           }
         } catch (error) {
           console.error("Error fetching order:", error);
@@ -61,7 +61,7 @@ export default function OrderDetailPage() {
     }
     return 'N/A';
   };
-  
+
   const generateOrderPDF = (currentOrder: Order) => {
     const doc = new jsPDF();
     const pageHeight = doc.internal.pageSize.height;
@@ -70,49 +70,70 @@ export default function OrderDetailPage() {
     let yPos = margin;
 
     if (storeDetails.logoUrl) {
-        // Placeholder for actual image loading logic
-        // doc.addImage(storeDetails.logoUrl, 'PNG', margin, yPos, 40, 15, undefined, 'FAST');
-        // yPos += 20;
+      // Placeholder for actual image loading logic
+      // doc.addImage(storeDetails.logoUrl, 'PNG', margin, yPos, 40, 15, undefined, 'FAST');
+      // yPos += 20;
     }
-    
-    doc.setFontSize(20); doc.setFont('helvetica', 'bold');
-    doc.text(storeDetails.name, pageWidth / 2, yPos, { align: 'center' }); yPos += 7;
-    doc.setFontSize(10); doc.setFont('helvetica', 'normal');
-    doc.text(storeDetails.storeType, pageWidth / 2, yPos, { align: 'center' }); yPos += 10;
+
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text(storeDetails.name, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 7;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(storeDetails.storeType, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 10;
 
     doc.setFontSize(9);
     doc.text(storeDetails.address, margin, yPos);
-    doc.text(storeDetails.contact, pageWidth - margin, yPos, { align: 'right' }); yPos += 5;
-    doc.text(`GSTIN: ${storeDetails.gstNo}`, margin, yPos); yPos += 8;
-    
-    doc.setLineWidth(0.5); doc.line(margin, yPos, pageWidth - margin, yPos); yPos += 8;
-    doc.setFontSize(16); doc.setFont('helvetica', 'bold');
-    doc.text('INVOICE', pageWidth / 2, yPos, { align: 'center' }); yPos += 8;
+    doc.text(storeDetails.contact, pageWidth - margin, yPos, { align: 'right' });
+    yPos += 5;
+    doc.text(`GSTIN: ${storeDetails.gstNo}`, margin, yPos);
+    yPos += 8;
 
-    doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+    doc.setLineWidth(0.5);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 8;
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('INVOICE', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 8;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
     doc.text(`Order No: ${currentOrder.orderNumber}`, margin, yPos);
-    doc.text(`Date: ${formatDate(currentOrder.orderDate)}`, pageWidth - margin, yPos, { align: 'right' }); yPos += 6;
+    doc.text(`Date: ${formatDate(currentOrder.orderDate)}`, pageWidth - margin, yPos, { align: 'right' });
+    yPos += 6;
 
-    const customerIdentifier = currentOrder.customerName ? `${currentOrder.customerName} (${currentOrder.customerMobile || 'N/A'})` : (currentOrder.customerMobile || 'Walk-in Customer');
-    doc.text(`Customer: ${customerIdentifier}`, margin, yPos); yPos += 10;
+    const customerIdentifier = currentOrder.customerName
+      ? `${currentOrder.customerName} (${currentOrder.customerMobile || 'N/A'})`
+      : (currentOrder.customerMobile || 'Walk-in Customer');
+    doc.text(`Customer: ${customerIdentifier}`, margin, yPos);
+    yPos += 10;
 
-    doc.setLineWidth(0.2); doc.line(margin, yPos - 2, pageWidth - margin, yPos - 2);
-    doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+    doc.setLineWidth(0.2);
+    doc.line(margin, yPos - 2, pageWidth - margin, yPos - 2);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
     const headX = [margin, margin + 70, margin + 95, margin + 115, margin + 140];
     doc.text('Product Name', headX[0], yPos);
     doc.text('SN/Barcode', headX[1], yPos);
     doc.text('Qty', headX[2], yPos, { align: 'right' });
     doc.text('Price', headX[3], yPos, { align: 'right' });
-    doc.text('Subtotal', headX[4] + 30, yPos, { align: 'right' }); 
+    doc.text('Subtotal', headX[4] + 30, yPos, { align: 'right' });
     yPos += 5;
-    doc.line(margin, yPos - 2, pageWidth - margin, yPos - 2); yPos += 3;
-    
+    doc.line(margin, yPos - 2, pageWidth - margin, yPos - 2);
+    yPos += 3;
+
     doc.setFont('helvetica', 'normal');
-    currentOrder.items.forEach(item => {
-      if (yPos > pageHeight - 40) { doc.addPage(); yPos = margin; }
+    currentOrder.items.forEach((item) => {
+      if (yPos > pageHeight - 40) {
+        doc.addPage();
+        yPos = margin;
+      }
       const itemSubtotal = item.price * item.billQuantity;
       doc.text(item.name, headX[0], yPos, { maxWidth: headX[1] - headX[0] - 5 });
-      doc.text(item.serialNumber || item.barcode || 'N/A', headX[1], yPos, { maxWidth: headX[2] - headX[1] - 5});
+      doc.text(item.serialNumber || item.barcode || 'N/A', headX[1], yPos, { maxWidth: headX[2] - headX[1] - 5 });
       doc.text(item.billQuantity.toString(), headX[2], yPos, { align: 'right' });
       doc.text(`$${item.price.toFixed(2)}`, headX[3], yPos, { align: 'right' });
       doc.text(`$${itemSubtotal.toFixed(2)}`, headX[4] + 30, yPos, { align: 'right' });
@@ -121,26 +142,32 @@ export default function OrderDetailPage() {
 
     yPos += 5;
     const summaryX = pageWidth - margin - 50;
-    doc.line(summaryX - 20, yPos, pageWidth - margin, yPos); yPos += 5;
+    doc.line(summaryX - 20, yPos, pageWidth - margin, yPos);
+    yPos += 5;
 
     doc.setFontSize(10);
     doc.text('Subtotal:', summaryX, yPos, { align: 'right' });
-    doc.text(`$${currentOrder.subtotal.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' }); yPos += 6;
+    doc.text(`$${currentOrder.subtotal.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
+    yPos += 6;
     doc.text(`Tax (${(storeDetails.gstNo ? (0.08 * 100) : 0).toFixed(0)}%):`, summaryX, yPos, { align: 'right' });
-    doc.text(`$${currentOrder.taxAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' }); yPos += 6;
-    
-    doc.setFontSize(12); doc.setFont('helvetica', 'bold');
-    doc.line(summaryX - 20, yPos, pageWidth - margin, yPos); yPos += 6;
-    doc.text('Total Amount:', summaryX, yPos, { align: 'right' });
-    doc.text(`$${currentOrder.totalAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' }); yPos += 15;
+    doc.text(`$${currentOrder.taxAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
+    yPos += 6;
 
-    doc.setFontSize(8); doc.setFont('helvetica', 'italic');
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.line(summaryX - 20, yPos, pageWidth - margin, yPos);
+    yPos += 6;
+    doc.text('Total Amount:', summaryX, yPos, { align: 'right' });
+    doc.text(`$${currentOrder.totalAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
+    yPos += 15;
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
     doc.text('Thank you for your business! - Generated by StockPilot', pageWidth / 2, pageHeight - 10, { align: 'center' });
 
     doc.save(`StockPilot-Bill-${currentOrder.orderNumber}.pdf`);
     toast({ title: "PDF Generated", description: "The order PDF has been downloaded." });
   };
-
 
   if (isLoading) {
     return (
@@ -148,17 +175,25 @@ export default function OrderDetailPage() {
         <Skeleton className="h-8 w-1/4" />
         <Skeleton className="h-10 w-1/2" />
         <Card>
-          <CardHeader><Skeleton className="h-6 w-1/3" /></CardHeader>
+          <CardHeader>
+            <Skeleton className="h-6 w-1/3" />
+          </CardHeader>
           <CardContent className="space-y-2">
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-3/4" />
           </CardContent>
         </Card>
         <Card>
-          <CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader>
-          <CardContent><Skeleton className="h-24 w-full" /></CardContent>
+          <CardHeader>
+            <Skeleton className="h-6 w-1/4" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-24 w-full" />
+          </CardContent>
         </Card>
-         <CardFooter><Skeleton className="h-10 w-1/4" /></CardFooter>
+        <CardFooter>
+          <Skeleton className="h-10 w-1/4" />
+        </CardFooter>
       </div>
     );
   }
@@ -176,7 +211,7 @@ export default function OrderDetailPage() {
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="text-2xl text-primary">Order Details: {order.orderNumber}</CardTitle>
-          <CardDescription>Date: {formatDate(order.orderDate)}</CardHeader>
+          <CardDescription>Date: {formatDate(order.orderDate)}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -227,13 +262,19 @@ export default function OrderDetailPage() {
             </Table>
           </div>
           <div className="text-right space-y-1 pr-4">
-            <p>Subtotal: <span className="font-semibold">${order.subtotal.toFixed(2)}</span></p>
-            <p>Tax: <span className="font-semibold">${order.taxAmount.toFixed(2)}</span></p>
-            <p className="text-xl font-bold">Total: <span className="text-primary">${order.totalAmount.toFixed(2)}</span></p>
+            <p>
+              Subtotal: <span className="font-semibold">${order.subtotal.toFixed(2)}</span>
+            </p>
+            <p>
+              Tax: <span className="font-semibold">${order.taxAmount.toFixed(2)}</span>
+            </p>
+            <p className="text-xl font-bold">
+              Total: <span className="text-primary">${order.totalAmount.toFixed(2)}</span>
+            </p>
           </div>
         </CardContent>
         <CardFooter className="flex justify-end space-x-3">
-           <Button variant="outline" onClick={() => generateOrderPDF(order)}>
+          <Button variant="outline" onClick={() => generateOrderPDF(order)}>
             <Printer className="mr-2 h-4 w-4" /> Print Bill
           </Button>
           <Button onClick={() => router.push(`/billing?fromOrder=${order.id}`)} className="bg-accent hover:bg-accent/90 text-accent-foreground">
