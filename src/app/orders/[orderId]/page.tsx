@@ -2,25 +2,29 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import type { Order } from '@/types';
+import type { Order, UserRole } from '@/types';
 import { getOrder } from '@/services/firebaseService';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Copy, Printer, Package } from 'lucide-react'; // Added Package
+import { ArrowLeft, Copy, Printer, Package, Edit } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
 import { Timestamp } from 'firebase/firestore'; 
 import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
-// import Logo from '@/components/icons/Logo'; // No longer needed here
 import { storeDetails } from '@/config/storeDetails';
 import { generateInvoicePdf } from '@/lib/pdfGenerator'; 
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import AuthGuard from '@/components/auth/AuthGuard';
+import { useAuth } from '@/hooks/useAuth';
+
+const allowedRoles: UserRole[] = ['owner', 'employee'];
 
 export default function OrderDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { userProfile } = useAuth();
   const orderId = params.orderId as string;
 
   const [order, setOrder] = useState<Order | null>(null);
@@ -104,6 +108,12 @@ export default function OrderDetailPage() {
     }
   };
 
+  const handleEditOrder = () => {
+    // Placeholder for edit order functionality
+    toast({ title: "Edit Order", description: "Order modification feature is not yet implemented.", variant: "default"});
+    // router.push(`/orders/${orderId}/edit`); // Example future route
+  };
+
 
   if (isLoading) {
     return (
@@ -140,89 +150,96 @@ export default function OrderDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <Button variant="outline" onClick={() => router.back()} size="sm">
-        <ArrowLeft className="mr-2 h-4 w-4" /> Back to Orders
-      </Button>
+    <AuthGuard allowedRoles={allowedRoles}>
+      <div className="space-y-6">
+        <Button variant="outline" onClick={() => router.back()} size="sm">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Orders
+        </Button>
 
-      <Card className="shadow-lg">
-        <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="text-xl sm:text-2xl text-primary">Order Details: {order.orderNumber}</CardTitle>
-          <CardDescription className="text-xs sm:text-sm">Date: {formatDate(order.orderDate)}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 p-4 sm:p-6 text-sm sm:text-base">
-          <div>
-            <h3 className="font-semibold text-md sm:text-lg mb-1">Customer Information</h3>
-            <p>Name: {order.customerName}</p>
-            <p>Mobile: {order.customerMobile}</p>
-            <p className="whitespace-normal break-words">Address: {order.customerAddress || 'N/A'}</p>
-          </div>
-          <div>
-            <h3 className="font-semibold text-md sm:text-lg mb-2">Items Ordered</h3>
-            <ScrollArea className="w-full whitespace-nowrap rounded-md border">
-              <Table className="min-w-[600px] sm:min-w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px] sm:w-[60px] px-2 sm:px-4">Image</TableHead>
-                    <TableHead className="px-2 sm:px-4">Product</TableHead>
-                    <TableHead className="px-2 sm:px-4">SN/Barcode</TableHead>
-                    <TableHead className="text-right px-2 sm:px-4">Price</TableHead>
-                    <TableHead className="text-center px-2 sm:px-4">Quantity</TableHead>
-                    <TableHead className="text-right px-2 sm:px-4">Subtotal</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {order.items.map((item, index) => (
-                    <TableRow key={item.productId + index}>
-                      <TableCell className="px-2 sm:px-4">
-                        {item.imageUrl ? (
-                          <Image
-                            src={item.imageUrl}
-                            alt={item.name}
-                            width={32}
-                            height={32}
-                            className="rounded-md object-cover sm:w-10 sm:h-10"
-                            data-ai-hint={item.imageHint || "product item"}
-                          />
-                        ) : (
-                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-secondary rounded-md flex items-center justify-center text-muted-foreground">
-                             <Package className="h-5 w-5 sm:h-6 sm:w-6" />
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs sm:text-sm px-2 sm:px-4 whitespace-normal break-words max-w-[120px] sm:max-w-xs">{item.name}</TableCell>
-                      <TableCell className="text-xs sm:text-sm px-2 sm:px-4 whitespace-normal break-words">{item.serialNumber || item.barcode || 'N/A'}</TableCell>
-                      <TableCell className="text-right text-xs sm:text-sm px-2 sm:px-4">₹{item.price.toFixed(2)}</TableCell>
-                      <TableCell className="text-center text-xs sm:text-sm px-2 sm:px-4">{item.billQuantity}</TableCell>
-                      <TableCell className="text-right text-xs sm:text-sm px-2 sm:px-4">₹{(item.price * item.billQuantity).toFixed(2)}</TableCell>
+        <Card className="shadow-lg">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-xl sm:text-2xl text-primary">Order Details: {order.orderNumber}</CardTitle>
+            <CardDescription className="text-xs sm:text-sm">Date: {formatDate(order.orderDate)}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 p-4 sm:p-6 text-sm sm:text-base">
+            <div>
+              <h3 className="font-semibold text-md sm:text-lg mb-1">Customer Information</h3>
+              <p>Name: {order.customerName}</p>
+              <p>Mobile: {order.customerMobile}</p>
+              <p className="whitespace-normal break-words">Address: {order.customerAddress || 'N/A'}</p>
+            </div>
+            <div>
+              <h3 className="font-semibold text-md sm:text-lg mb-2">Items Ordered</h3>
+              <ScrollArea className="w-full whitespace-nowrap rounded-md border">
+                <Table className="min-w-[600px] sm:min-w-full">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[50px] sm:w-[60px] px-2 sm:px-4">Image</TableHead>
+                      <TableHead className="px-2 sm:px-4">Product</TableHead>
+                      <TableHead className="px-2 sm:px-4">SN/Barcode</TableHead>
+                      <TableHead className="text-right px-2 sm:px-4">Price</TableHead>
+                      <TableHead className="text-center px-2 sm:px-4">Quantity</TableHead>
+                      <TableHead className="text-right px-2 sm:px-4">Subtotal</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <ScrollBar orientation="horizontal" />
-            </ScrollArea>
-          </div>
-          <div className="text-right space-y-1 pr-2 sm:pr-4">
-            <p>
-              Subtotal: <span className="font-semibold">₹{order.subtotal.toFixed(2)}</span>
-            </p>
-            <p>
-              GST: <span className="font-semibold">₹{order.taxAmount.toFixed(2)}</span>
-            </p>
-            <p className="text-lg sm:text-xl font-bold">
-              Total: <span className="text-primary">₹{order.totalAmount.toFixed(2)}</span>
-            </p>
-          </div>
-        </CardContent>
-        <CardFooter className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 p-4 sm:p-6">
-          <Button variant="outline" onClick={() => handlePrintOrderPDF(order)} className="w-full sm:w-auto">
-            <Printer className="mr-2 h-4 w-4" /> Print Bill
-          </Button>
-          <Button onClick={() => router.push(`/billing?fromOrder=${order.id}`)} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
-            <Copy className="mr-2 h-4 w-4" /> Re-create Bill
-          </Button>
-        </CardFooter>
-      </Card>
-    </div>
+                  </TableHeader>
+                  <TableBody>
+                    {order.items.map((item, index) => (
+                      <TableRow key={item.productId + index}>
+                        <TableCell className="px-2 sm:px-4">
+                          {item.imageUrl ? (
+                            <Image
+                              src={item.imageUrl}
+                              alt={item.name}
+                              width={32}
+                              height={32}
+                              className="rounded-md object-cover sm:w-10 sm:h-10"
+                              data-ai-hint={item.imageHint || "product item"}
+                            />
+                          ) : (
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-secondary rounded-md flex items-center justify-center text-muted-foreground">
+                              <Package className="h-5 w-5 sm:h-6 sm:w-6" />
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs sm:text-sm px-2 sm:px-4 whitespace-normal break-words max-w-[120px] sm:max-w-xs">{item.name}</TableCell>
+                        <TableCell className="text-xs sm:text-sm px-2 sm:px-4 whitespace-normal break-words">{item.serialNumber || item.barcode || 'N/A'}</TableCell>
+                        <TableCell className="text-right text-xs sm:text-sm px-2 sm:px-4">₹{item.price.toFixed(2)}</TableCell>
+                        <TableCell className="text-center text-xs sm:text-sm px-2 sm:px-4">{item.billQuantity}</TableCell>
+                        <TableCell className="text-right text-xs sm:text-sm px-2 sm:px-4">₹{(item.price * item.billQuantity).toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            </div>
+            <div className="text-right space-y-1 pr-2 sm:pr-4">
+              <p>
+                Subtotal: <span className="font-semibold">₹{order.subtotal.toFixed(2)}</span>
+              </p>
+              <p>
+                GST: <span className="font-semibold">₹{order.taxAmount.toFixed(2)}</span>
+              </p>
+              <p className="text-lg sm:text-xl font-bold">
+                Total: <span className="text-primary">₹{order.totalAmount.toFixed(2)}</span>
+              </p>
+            </div>
+          </CardContent>
+          <CardFooter className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 p-4 sm:p-6">
+            {userProfile?.role === 'owner' && (
+              <Button variant="outline" onClick={handleEditOrder} className="w-full sm:w-auto">
+                <Edit className="mr-2 h-4 w-4" /> Edit Order (Placeholder)
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => handlePrintOrderPDF(order)} className="w-full sm:w-auto">
+              <Printer className="mr-2 h-4 w-4" /> Print Bill
+            </Button>
+            <Button onClick={() => router.push(`/billing?fromOrder=${order.id}`)} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
+              <Copy className="mr-2 h-4 w-4" /> Re-create Bill
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    </AuthGuard>
   );
 }

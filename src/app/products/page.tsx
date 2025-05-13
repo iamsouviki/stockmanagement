@@ -5,13 +5,16 @@ import { Button } from "@/components/ui/button";
 import ProductTable from "@/components/products/ProductTable";
 import ProductDialog from "@/components/products/ProductDialog";
 import type { ProductFormData } from "@/components/products/ProductForm";
-import type { Product, Category } from "@/types";
+import type { Product, Category, UserRole } from "@/types";
 import { PlusCircle, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getProducts, addProduct, updateProduct, deleteProduct, getCategories } from "@/services/firebaseService";
-import { Skeleton } from "@/components/ui/skeleton"; // For loading state
+import { Skeleton } from "@/components/ui/skeleton"; 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Link from "next/link";
+import AuthGuard from "@/components/auth/AuthGuard";
+
+const allowedRoles: UserRole[] = ['owner', 'employee'];
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -81,7 +84,6 @@ export default function ProductsPage() {
         variant: "destructive",
         duration: 7000,
       });
-      // Allow editing other fields if needed, but category selection will be disabled/empty.
     }
     setEditingProduct(product);
     setIsDialogOpen(true);
@@ -109,7 +111,6 @@ export default function ProductsPage() {
     try {
       if (editingProduct) {
         await updateProduct(editingProduct.id, productData);
-        // Update products list correctly reflecting potential category name change
         setProducts(
           products.map((p) =>
             p.id === editingProduct.id ? { ...editingProduct, ...productData, categoryName: categoryName } : p
@@ -126,7 +127,6 @@ export default function ProductsPage() {
           id: newProductId,
           imageUrl: `https://picsum.photos/seed/${encodeURIComponent(data.name)}/200/200`,
           imageHint: `${data.name.split(' ')[0].toLowerCase()} device`,
-          // createdAt and updatedAt will be set by Firebase
         };
         setProducts([newProductEntry, ...products].sort((a, b) => a.name.localeCompare(b.name)));
         toast({
@@ -143,55 +143,56 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-primary">Product Management</h1>
-          <p className="text-muted-foreground">
-            Manage your electronic store's inventory here.
-          </p>
+    <AuthGuard allowedRoles={allowedRoles}>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-primary">Product Management</h1>
+            <p className="text-muted-foreground">
+              Manage your electronic store's inventory here.
+            </p>
+          </div>
+          <Button onClick={handleAddProduct} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
+            <PlusCircle className="mr-2 h-5 w-5" /> Add New Product
+          </Button>
         </div>
-        <Button onClick={handleAddProduct} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
-          <PlusCircle className="mr-2 h-5 w-5" /> Add New Product
-        </Button>
+
+        {isLoading ? (
+          <div className="space-y-4">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        ) : (
+          <>
+            {categories.length === 0 && (
+              <Alert variant="default" className="border-accent text-accent bg-accent/10">
+                <Info className="h-5 w-5 !text-accent" />
+                <AlertTitle className="font-semibold">No Categories Available</AlertTitle>
+                <AlertDescription>
+                  You currently have no product categories defined. Please 
+                  <Link href="/categories" className="underline font-medium hover:text-accent/80 mx-1">add categories</Link> 
+                  before adding products to better organize your inventory.
+                </AlertDescription>
+              </Alert>
+            )}
+            <ProductTable
+              products={products}
+              onEdit={handleEditProduct}
+              onDelete={handleDeleteProduct}
+            />
+          </>
+        )}
+
+        <ProductDialog
+          isOpen={isDialogOpen}
+          onOpenChange={setIsDialogOpen}
+          product={editingProduct}
+          onSubmit={handleSubmitProduct}
+          categories={categories}
+        />
       </div>
-
-      {isLoading ? (
-        <div className="space-y-4">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
-        </div>
-      ) : (
-        <>
-          {categories.length === 0 && (
-            <Alert variant="default" className="border-accent text-accent bg-accent/10">
-              <Info className="h-5 w-5 !text-accent" />
-              <AlertTitle className="font-semibold">No Categories Available</AlertTitle>
-              <AlertDescription>
-                You currently have no product categories defined. Please 
-                <Link href="/categories" className="underline font-medium hover:text-accent/80 mx-1">add categories</Link> 
-                before adding products to better organize your inventory.
-              </AlertDescription>
-            </Alert>
-          )}
-          <ProductTable
-            products={products}
-            // categories prop is not directly used by ProductTable anymore for icons
-            onEdit={handleEditProduct}
-            onDelete={handleDeleteProduct}
-          />
-        </>
-      )}
-
-      <ProductDialog
-        isOpen={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        product={editingProduct}
-        onSubmit={handleSubmitProduct}
-        categories={categories} // Ensure categories are passed here
-      />
-    </div>
+    </AuthGuard>
   );
 }

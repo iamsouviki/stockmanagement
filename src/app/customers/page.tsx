@@ -5,11 +5,14 @@ import { Button } from "@/components/ui/button";
 import CustomerTable from "@/components/customers/CustomerTable";
 import CustomerDialog from "@/components/customers/CustomerDialog";
 import type { CustomerFormData } from "@/components/customers/CustomerForm";
-import type { Customer } from "@/types";
+import type { Customer, UserRole } from "@/types";
 import { PlusCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getCustomers, addCustomer, updateCustomer, deleteCustomer, findCustomerByMobile } from "@/services/firebaseService";
 import { Skeleton } from "@/components/ui/skeleton";
+import AuthGuard from "@/components/auth/AuthGuard";
+
+const allowedRoles: UserRole[] = ['owner', 'employee'];
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -61,7 +64,6 @@ export default function CustomersPage() {
 
   const handleSubmitCustomer = async (data: CustomerFormData) => {
     try {
-      // Check for mobile number uniqueness
       const existingCustomersWithMobile = await findCustomerByMobile(data.mobileNumber);
       const isMobileTaken = existingCustomersWithMobile.some(
         c => editingCustomer ? c.id !== editingCustomer.id : true
@@ -124,43 +126,45 @@ export default function CustomersPage() {
 
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-primary">Customer Management</h1>
-          <p className="text-muted-foreground">
-            Manage your customer database here.
-          </p>
+    <AuthGuard allowedRoles={allowedRoles}>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-primary">Customer Management</h1>
+            <p className="text-muted-foreground">
+              Manage your customer database here.
+            </p>
+          </div>
+          <Button onClick={handleAddCustomer} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
+            <PlusCircle className="mr-2 h-5 w-5" /> Add New Customer
+          </Button>
         </div>
-        <Button onClick={handleAddCustomer} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
-          <PlusCircle className="mr-2 h-5 w-5" /> Add New Customer
-        </Button>
-      </div>
-      
-      {isLoading ? (
-         <div className="space-y-4">
-          <Skeleton className="h-10 w-full sm:w-72 mb-4" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
-        </div>
-      ) : (
-        <CustomerTable
-          customers={filteredCustomers}
-          onEdit={handleEditCustomer}
-          onDelete={handleDeleteCustomer}
-          searchTerm={searchTerm}
-          onSearchTermChange={setSearchTerm}
-        />
-      )}
+        
+        {isLoading ? (
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-full sm:w-72 mb-4" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        ) : (
+          <CustomerTable
+            customers={filteredCustomers}
+            onEdit={handleEditCustomer}
+            onDelete={handleDeleteCustomer}
+            searchTerm={searchTerm}
+            onSearchTermChange={setSearchTerm}
+          />
+        )}
 
-      <CustomerDialog
-        isOpen={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        customer={editingCustomer}
-        onSubmit={handleSubmitCustomer}
-        existingMobileNumbers={existingMobileNumbers} // This prop might be less useful with async validation
-      />
-    </div>
+        <CustomerDialog
+          isOpen={isDialogOpen}
+          onOpenChange={setIsDialogOpen}
+          customer={editingCustomer}
+          onSubmit={handleSubmitCustomer}
+          existingMobileNumbers={existingMobileNumbers}
+        />
+      </div>
+    </AuthGuard>
   );
 }

@@ -2,11 +2,17 @@
 import { Suspense } from 'react';
 import BillingPageContent from '@/components/billing/BillingPageContent';
 import BillingPageLoadingSkeleton from '@/components/billing/BillingPageLoadingSkeleton';
+import AuthGuard from '@/components/auth/AuthGuard';
+import type { UserRole } from '@/types';
+
+const allowedRoles: UserRole[] = ['owner', 'employee'];
 
 export default function BillingPage() {
   return (
-    <Suspense fallback={<BillingPageLoadingSkeleton />}>
-      <BillingPageContent />
-    </Suspense>
+    <AuthGuard allowedRoles={allowedRoles}>
+      <Suspense fallback={<BillingPageLoadingSkeleton />}>
+        <BillingPageContent />
+      </Suspense>
+    </AuthGuard>
   );
 }

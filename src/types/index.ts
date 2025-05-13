@@ -27,35 +27,35 @@ export interface OrderItemData {
   name: string;
   price: number; // Price at the time of sale
   billQuantity: number;
-  imageUrl?: string | null; // Ensure it can be null if not present
-  imageHint?: string | null; // Ensure it can be null if not present
-  serialNumber?: string | null; // Capture SN for items in order
-  barcode?: string | null; // Capture barcode for items in order
+  imageUrl?: string | null; 
+  imageHint?: string | null; 
+  serialNumber?: string | null; 
+  barcode?: string | null; 
 }
 
 export interface Order {
   id: string; // Firebase document ID
-  orderNumber: string; // Human-readable, e.g., YYYYMMDD-HHMMSS
-  customerId: string; // Use a placeholder for walk-in customers.
-  customerName: string; // Denormalized from Customer record or "Walk-in Customer"
-  customerMobile: string; // Denormalized or "N/A"
-  customerAddress?: string | null; // Denormalized or null/N/A
+  orderNumber: string; 
+  customerId: string; // Non-optional: Use WALK_IN_CUSTOMER_ID for walk-ins
+  customerName: string; 
+  customerMobile: string; 
+  customerAddress?: string | null; 
   items: OrderItemData[];
   subtotal: number;
   taxAmount: number;
   totalAmount: number;
-  orderDate: Timestamp; // Firestore Timestamp
-  createdAt?: Timestamp; // Firestore server timestamp
-  updatedAt?: Timestamp; // Firestore server timestamp
+  orderDate: Timestamp; 
+  createdAt?: Timestamp; 
+  updatedAt?: Timestamp; 
 }
 
-export interface BillItem extends Product { // Used for temporary bill construction on client
+export interface BillItem extends Product { 
   billQuantity: number;
 }
 
 export interface Customer {
   id: string; // Firebase document ID
-  name: string; // Full name
+  name: string; 
   mobileNumber: string;
   email?: string;
   address?: string;
@@ -77,3 +77,14 @@ export interface StoreDetails {
 
 export const WALK_IN_CUSTOMER_ID = "WALK_IN_CUSTOMER";
 
+// New User types for Authentication and Roles
+export type UserRole = 'owner' | 'employee';
+
+export interface UserProfile {
+  id: string; // Firebase Auth UID
+  email: string | null;
+  displayName: string | null;
+  role: UserRole;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}

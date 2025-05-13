@@ -6,29 +6,51 @@ import Logo from '@/components/icons/Logo';
 import NavItem from './NavItem';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Menu, Home, Boxes, Receipt, History, Users, Tags } from 'lucide-react';
+import { Menu, Home, Boxes, Receipt, History, Users, Tags, LogIn, LogOut, SettingsIcon } from 'lucide-react'; // Added LogIn, LogOut, SettingsIcon
 import type { LucideIcon } from 'lucide-react';
 import { usePathname } from 'next/navigation'; 
-import { useState } from 'react'; 
+import { useState, useEffect } from 'react'; 
+import { useAuth } from '@/hooks/useAuth'; // Import useAuth
 
 interface NavLink {
   href: string;
   label: string;
   icon: LucideIcon;
+  roles?: ('owner' | 'employee')[]; // Optional roles to display the link
 }
 
 const navLinks: NavLink[] = [
   { href: '/', label: 'Dashboard', icon: Home },
-  { href: '/products', label: 'Products', icon: Boxes },
-  { href: '/categories', label: 'Categories', icon: Tags },
-  { href: '/billing', label: 'Billing', icon: Receipt },
-  { href: '/orders', label: 'Orders', icon: History },
-  { href: '/customers', label: 'Customers', icon: Users },
+  { href: '/products', label: 'Products', icon: Boxes, roles: ['owner', 'employee'] },
+  { href: '/categories', label: 'Categories', icon: Tags, roles: ['owner', 'employee'] },
+  { href: '/billing', label: 'Billing', icon: Receipt, roles: ['owner', 'employee'] },
+  { href: '/orders', label: 'Orders', icon: History, roles: ['owner', 'employee'] },
+  { href: '/customers', label: 'Customers', icon: Users, roles: ['owner', 'employee'] },
+  { href: '/settings', label: 'Settings', icon: SettingsIcon, roles: ['owner'] },
 ];
 
 export default function Header() {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { currentUser, userProfile, logout, isLoading } = useAuth(); // Get auth state and logout function
+
+  const [visibleNavLinks, setVisibleNavLinks] = useState<NavLink[]>([]);
+
+  useEffect(() => {
+    if (!isLoading) {
+      if (currentUser && userProfile) {
+        setVisibleNavLinks(
+          navLinks.filter(link => 
+            !link.roles || link.roles.includes(userProfile.role)
+          )
+        );
+      } else {
+        // Show minimal links or public links if user is not logged in. For now, dashboard only.
+        setVisibleNavLinks(navLinks.filter(link => link.href === '/')); 
+      }
+    }
+  }, [currentUser, userProfile, isLoading]);
+
 
   return (
     <header className="bg-primary shadow-md sticky top-0 z-50">
@@ -44,13 +66,47 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-1">
-            {navLinks.map((link) => (
+            {!isLoading && visibleNavLinks.map((link) => (
               <NavItem key={link.href} href={link.href} label={link.label} icon={link.icon} currentPathname={pathname}/>
             ))}
           </nav>
 
+          {/* Auth Button Desktop */}
+          <div className="hidden md:flex items-center ml-2">
+            {isLoading ? (
+              <Button variant="ghost" size="sm" className="text-primary-foreground hover:bg-primary-foreground/20" disabled>Loading...</Button>
+            ) : currentUser ? (
+              <Button variant="ghost" size="sm" onClick={logout} className="text-primary-foreground hover:bg-primary-foreground/20">
+                <LogOut className="mr-2 h-4 w-4" /> Logout
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" asChild className="text-primary-foreground hover:bg-primary-foreground/20">
+                <Link href="/login">
+                  <LogIn className="mr-2 h-4 w-4" /> Login
+                </Link>
+              </Button>
+            )}
+          </div>
+
+
           {/* Mobile Navigation Trigger */}
-          <div className="md:hidden">
+          <div className="md:hidden flex items-center">
+             {/* Auth Button Mobile (before menu icon for better flow) */}
+            {isLoading ? (
+                 <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/20 h-9 w-9 sm:h-10 sm:w-10" disabled></Button> /* Placeholder for width */
+            ) : currentUser ? (
+              <Button variant="ghost" size="icon" onClick={logout} className="text-primary-foreground hover:bg-primary-foreground/20 h-9 w-9 sm:h-10 sm:w-10 mr-1">
+                <LogOut className="h-5 w-5 sm:h-6 sm:w-6" />
+                <span className="sr-only">Logout</span>
+              </Button>
+            ) : (
+              <Button variant="ghost" size="icon" asChild className="text-primary-foreground hover:bg-primary-foreground/20 h-9 w-9 sm:h-10 sm:w-10 mr-1">
+                <Link href="/login">
+                  <LogIn className="h-5 w-5 sm:h-6 sm:w-6" />
+                   <span className="sr-only">Login</span>
+                </Link>
+              </Button>
+            )}
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/20 h-9 w-9 sm:h-10 sm:w-10">
@@ -70,7 +126,7 @@ export default function Header() {
                   </Link>
                 </div>
                 <nav className="flex flex-col space-y-1.5 sm:space-y-2">
-                  {navLinks.map((link) => (
+                  {!isLoading && visibleNavLinks.map((link) => (
                      <SheetTrigger asChild key={link.href}>
                         <NavItem href={link.href} label={link.label} icon={link.icon} isMobile currentPathname={pathname} onClick={() => setIsMobileMenuOpen(false)}/>
                      </SheetTrigger>
