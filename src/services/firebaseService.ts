@@ -17,7 +17,7 @@ import {
   startAfter,
 } from 'firebase/firestore';
 import type { Product, Customer, Category, Order, OrderItemData } from '@/types';
-import { WALK_IN_CUSTOMER_ID } from '@/types'; // Import WALK_IN_CUSTOMER_ID
+import { WALK_IN_CUSTOMER_ID } from '@/types'; 
 import { format } from 'date-fns';
 
 // Generic CRUD operations
@@ -102,26 +102,18 @@ export const addOrderAndDecrementStock = async (
   itemsToDecrement: { productId: string, quantity: number }[]
 ): Promise<string> => {
   const batch = writeBatch(db);
-
   const now = new Date();
   const orderNumber = `ORD-${format(now, 'yyyyMMdd-HHmmssSSS')}`;
-  
-  // Resolve customer details, ensuring defaults for walk-in or missing info
-  // These values are guaranteed to be strings by the Order type after this resolution.
-  const customerId = orderData.customerId || WALK_IN_CUSTOMER_ID;
-  const customerName = orderData.customerName || (customerId === WALK_IN_CUSTOMER_ID ? "Walk-in Customer" : "Unknown Customer");
-  const customerMobile = orderData.customerMobile || (customerId === WALK_IN_CUSTOMER_ID ? "N/A" : "N/A");
-  const customerAddress = orderData.customerAddress || null; // Default to null if not provided
 
-  const completeOrderData: Omit<Order, 'id'> = { // Data to be written to Firestore
-    ...orderData, // Spread incoming data first
+  // 'orderData' from BillingPageContent.tsx already contains resolved customerId, customerName, customerMobile, 
+  // customerAddress (or defaults for walk-in), items, subtotal, taxAmount, and totalAmount.
+  // We just need to add the server-generated fields.
+  
+  const completeOrderData: Omit<Order, 'id'> = {
+    ...orderData, // Spread client-prepared data (includes customer details, items, totals)
     orderNumber,
-    customerId, 
-    customerName,
-    customerMobile,
-    customerAddress,
     orderDate: Timestamp.fromDate(now),
-    createdAt: serverTimestamp() as Timestamp,
+    createdAt: serverTimestamp() as Timestamp, // Firestore will set these
     updatedAt: serverTimestamp() as Timestamp,
   };
 
@@ -136,11 +128,12 @@ export const addOrderAndDecrementStock = async (
       const newStock = Math.max(0, currentStock - item.quantity);
       batch.update(productRef, { quantity: newStock, updatedAt: serverTimestamp() });
     } else {
+      // This case should ideally not happen if product selection is robust
       console.warn(`Product with ID ${item.productId} not found for stock decrement.`);
+      // Consider how to handle this - rollback or proceed with a warning. For now, it proceeds.
     }
   }
 
   await batch.commit();
   return newOrderRef.id;
 };
-

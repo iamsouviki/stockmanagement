@@ -86,33 +86,27 @@ export function generateInvoicePdf(
   doc.text(`Date: ${formatDateForPdf(order.orderDate)}`, pageWidth - margin, yPos, { align: 'right' });
   yPos += 6;
 
-  // Customer Name and Mobile
-  doc.text(`Customer: ${order.customerName}`, margin, yPos);
-  const customerMobileText = `Mobile: ${order.customerMobile}`;
-  
-  const customerNameWidth = doc.getTextWidth(`Customer: ${order.customerName}`);
-  const mobileTextWidth = doc.getTextWidth(customerMobileText);
-  const availableSpaceForMobile = pageWidth - (margin * 2) - customerNameWidth - 5; 
-
-  if (mobileTextWidth < availableSpaceForMobile) {
-    doc.text(customerMobileText, margin + customerNameWidth + 5, yPos);
-  } else { 
-    yPos += 6;
-    doc.text(customerMobileText, margin, yPos);
-  }
+  // Customer Name
+  doc.text(`Customer: ${order.customerName || 'N/A'}`, margin, yPos);
   yPos += 6;
 
+  // Customer Mobile
+  doc.text(`Mobile: ${order.customerMobile || 'N/A'}`, margin, yPos);
+  yPos += 6;
 
   // Customer Address (if available)
   if (order.customerAddress) {
+    doc.setFontSize(9); // Use slightly smaller font for address to help with long text
     const addressLines = doc.splitTextToSize(`Address: ${order.customerAddress}`, pageWidth - (margin * 2));
     doc.text(addressLines, margin, yPos);
-    yPos += (addressLines.length * (doc.getLineHeight('helvetica', 'normal', 10) / doc.internal.scaleFactor)) + 2; 
+    const addressLineHeight = (doc.getLineHeight('helvetica', 'normal', 9) / doc.internal.scaleFactor);
+    yPos += (addressLines.length * addressLineHeight) + 2; // +2 for a bit of padding
+    doc.setFontSize(10); // Reset font size for subsequent text
   } else {
     doc.text(`Address: N/A`, margin, yPos);
     yPos += 6;
   }
-  yPos += 2; 
+  yPos += 2; // Extra padding before table headers
 
   // Column definitions
   const paddingBetweenCols = 5;
@@ -131,7 +125,7 @@ export function generateInvoicePdf(
   };
   
   const drawTableHeaders = () => {
-    yPos += 2; // Add some space before headers
+    yPos += 2; 
     doc.setLineWidth(0.2);
     doc.line(margin, yPos, pageWidth - margin, yPos); 
     yPos += 5; 
