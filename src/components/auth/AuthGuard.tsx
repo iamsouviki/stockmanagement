@@ -1,3 +1,4 @@
+// src/components/auth/AuthGuard.tsx
 'use client';
 
 import { useAuth } from '@/hooks/useAuth';
@@ -32,19 +33,18 @@ export default function AuthGuard({ children, allowedRoles, redirectPath = '/log
   const [isAuthorizedToRender, setIsAuthorizedToRender] = useState(false);
 
   useEffect(() => {
-    // Default to not authorized until checks pass
     let newAuthorizedState = false; 
     // console.log(
     //   `AuthGuard (${pathname}): Effect run. AuthLoading: ${isAuthLoading}, ` +
     //   `CurrentUser: ${currentUser ? currentUser.uid : 'null'}, ` +
     //   `UserProfile: ${userProfile ? userProfile.role : 'null'}, ` +
     //   `AllowedRoles: ${allowedRoles?.join(',')}, ` +
-    //   `Current isAuthorizedToRender: ${isAuthorizedToRender}`
+    //   `Current isAuthorizedToRender: ${isAuthorizedToRender}` // Log current state before change
     // );
 
     if (isAuthLoading) {
       // console.log(`AuthGuard (${pathname}): Auth is loading. Not authorizing render yet.`);
-      // newAuthorizedState remains false
+      // newAuthorizedState remains false, so skeleton will be shown
     } else {
       // Auth loading is false, proceed with checks
       if (!currentUser) {
@@ -64,29 +64,35 @@ export default function AuthGuard({ children, allowedRoles, redirectPath = '/log
           // console.log(`AuthGuard (${pathname}): Roles required: ${allowedRoles.join(', ')}.`);
           if (!userProfile) {
             // console.warn(`AuthGuard (${pathname}): User authenticated but profile is null. Cannot check roles. Redirecting to /.`);
-            if (pathname !== '/') router.replace('/'); // Or a specific "unauthorized" page
+            // If user is authenticated, but no profile, and roles ARE required by this route,
+            // then they are not authorized for THIS specific route.
+            // Redirect to a general page (e.g., dashboard or login if they somehow bypassed it).
+            // Avoid redirecting to the same page if it's already `/` to prevent loops.
+            if (pathname !== '/') router.replace('/');
             // newAuthorizedState remains false
           } else if (!allowedRoles.includes(userProfile.role)) {
             // console.warn(`AuthGuard (${pathname}): User role '${userProfile.role}' not in allowed roles: ${allowedRoles.join(', ')}. Redirecting to /.`);
-            if (pathname !== '/') router.replace('/'); // Or a specific "unauthorized" page
+             if (pathname !== '/') router.replace('/');
             // newAuthorizedState remains false
           } else {
             // console.log(`AuthGuard (${pathname}): User role '${userProfile.role}' is allowed. Authorizing render.`);
             newAuthorizedState = true; // Role check passed
           }
         } else {
-          // No specific roles required, user is authenticated
+          // No specific roles required for this route, user is authenticated.
+          // This is typically for the main dashboard page or public authenticated pages.
           // console.log(`AuthGuard (${pathname}): No specific roles required. Authorizing render.`);
           newAuthorizedState = true;
         }
       }
     }
     
+    // Only update state if it has actually changed to prevent unnecessary re-renders
     if (isAuthorizedToRender !== newAuthorizedState) {
       setIsAuthorizedToRender(newAuthorizedState);
     }
 
-  }, [currentUser, userProfile, isAuthLoading, router, allowedRoles, redirectPath, pathname, isAuthorizedToRender]);
+  }, [currentUser, userProfile, isAuthLoading, router, allowedRoles, redirectPath, pathname]);
 
 
   if (isAuthLoading) {
