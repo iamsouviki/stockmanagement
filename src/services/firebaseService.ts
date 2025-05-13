@@ -67,8 +67,10 @@ const deleteDocument = async (collectionName: string, id: string): Promise<void>
 
 // Categories Service
 export const getCategories = () => getCollection<Category>('categories', 'name');
-export const addCategory = (data: Omit<Category, 'id'>) => addDocument<Category>('categories', data);
-// Add updateCategory and deleteCategory if needed
+export const addCategory = (data: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => addDocument<Category>('categories', data);
+export const updateCategory = (id: string, data: Partial<Omit<Category, 'id' | 'createdAt' | 'updatedAt'>>) => updateDocument<Category>('categories', id, data);
+export const deleteCategory = (id: string) => deleteDocument('categories', id);
+
 
 // Products Service
 export const getProducts = () => getCollection<Product>('products', 'name');
@@ -105,6 +107,7 @@ export const addOrderAndDecrementStock = async (orderData: Omit<Order, 'id' | 'o
     orderNumber,
     orderDate: Timestamp.fromDate(now), // Use Firestore Timestamp
     createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(), // Add updatedAt for orders as well
   };
 
   // 2. Create a new order document reference

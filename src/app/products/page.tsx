@@ -6,10 +6,12 @@ import ProductTable from "@/components/products/ProductTable";
 import ProductDialog from "@/components/products/ProductDialog";
 import type { ProductFormData } from "@/components/products/ProductForm";
 import type { Product, Category } from "@/types";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getProducts, addProduct, updateProduct, deleteProduct, getCategories } from "@/services/firebaseService";
 import { Skeleton } from "@/components/ui/skeleton"; // For loading state
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import Link from "next/link";
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -44,11 +46,43 @@ export default function ProductsPage() {
   }, [toast]);
   
   const handleAddProduct = () => {
+    if (categories.length === 0) {
+      toast({
+        title: "No Categories Found",
+        description: (
+          <div className="space-y-2">
+            <p>Please add categories first before adding products.</p>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/categories">Go to Categories</Link>
+            </Button>
+          </div>
+        ),
+        variant: "destructive",
+        duration: 7000,
+      });
+      return;
+    }
     setEditingProduct(null);
     setIsDialogOpen(true);
   };
 
   const handleEditProduct = (product: Product) => {
+     if (categories.length === 0 && !product.categoryId) {
+       toast({
+        title: "No Categories Available",
+        description: (
+          <div className="space-y-2">
+            <p>Please add categories first. You cannot edit this product's category until some are available.</p>
+             <Button variant="outline" size="sm" asChild>
+              <Link href="/categories">Go to Categories</Link>
+            </Button>
+          </div>
+        ),
+        variant: "destructive",
+        duration: 7000,
+      });
+      // Allow editing other fields if needed, but category selection will be disabled/empty.
+    }
     setEditingProduct(product);
     setIsDialogOpen(true);
   };
@@ -75,9 +109,10 @@ export default function ProductsPage() {
     try {
       if (editingProduct) {
         await updateProduct(editingProduct.id, productData);
+        // Update products list correctly reflecting potential category name change
         setProducts(
           products.map((p) =>
-            p.id === editingProduct.id ? { ...editingProduct, ...productData } : p
+            p.id === editingProduct.id ? { ...editingProduct, ...productData, categoryName: categoryName } : p
           )
         );
         toast({
@@ -86,15 +121,14 @@ export default function ProductsPage() {
         });
       } else {
         const newProductId = await addProduct(productData);
-        // Fetch the newly added product to get its server-generated fields (like createdAt)
-        // For simplicity, we'll just add it with client data + ID
         const newProductEntry: Product = {
           ...productData,
           id: newProductId,
           imageUrl: `https://picsum.photos/seed/${encodeURIComponent(data.name)}/200/200`,
           imageHint: `${data.name.split(' ')[0].toLowerCase()} device`,
+          // createdAt and updatedAt will be set by Firebase
         };
-        setProducts([newProductEntry, ...products]);
+        setProducts([newProductEntry, ...products].sort((a, b) => a.name.localeCompare(b.name)));
         toast({
           title: "Product Added",
           description: `"${data.name}" has been successfully added.`,
@@ -130,12 +164,25 @@ export default function ProductsPage() {
           <Skeleton className="h-20 w-full" />
         </div>
       ) : (
-        <ProductTable
-          products={products}
-          categories={categories}
-          onEdit={handleEditProduct}
-          onDelete={handleDeleteProduct}
-        />
+        <>
+          {categories.length === 0 && (
+            <Alert variant="default" className="border-accent text-accent bg-accent/10">
+              <Info className="h-5 w-5 !text-accent" />
+              <AlertTitle className="font-semibold">No Categories Available</AlertTitle>
+              <AlertDescription>
+                You currently have no product categories defined. Please 
+                <Link href="/categories" className="underline font-medium hover:text-accent/80 mx-1">add categories</Link> 
+                before adding products to better organize your inventory.
+              </AlertDescription>
+            </Alert>
+          )}
+          <ProductTable
+            products={products}
+            // categories prop is not directly used by ProductTable anymore for icons
+            onEdit={handleEditProduct}
+            onDelete={handleDeleteProduct}
+          />
+        </>
       )}
 
       <ProductDialog
@@ -143,7 +190,7 @@ export default function ProductsPage() {
         onOpenChange={setIsDialogOpen}
         product={editingProduct}
         onSubmit={handleSubmitProduct}
-        categories={categories}
+        categories={categories} // Ensure categories are passed here
       />
     </div>
   );

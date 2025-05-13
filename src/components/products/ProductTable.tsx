@@ -2,8 +2,7 @@
 "use client";
 
 import Image from 'next/image';
-import type { Product, Category } from "@/types"; // Import Category
-import { categoryIcons } from "@/data/mockData"; // Keep for icons if IDs are stable
+import type { Product } from "@/types"; // Category prop no longer needed here for icons
 import {
   Table,
   TableBody,
@@ -14,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, Package } from "lucide-react";
+import { Pencil, Trash2, Package, Tag } from "lucide-react"; // Added Tag icon
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,24 +31,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 interface ProductTableProps {
   products: Product[];
-  categories: Category[]; // Add categories prop
   onEdit: (product: Product) => void;
   onDelete: (productId: string) => void;
 }
 
-const ProductTable: React.FC<ProductTableProps> = ({ products, categories, onEdit, onDelete }) => {
-  // categoryName is now part of the Product object if denormalized
-  // If not, you would find it from the categories prop:
-  // const getCategoryName = (categoryId: string) => {
-  //   return categories.find(cat => cat.id === categoryId)?.name || "Unknown";
-  // };
-
-  const CategoryIcon = ({ categoryId }: { categoryId: string }) => {
-    const IconComponent = categoryIcons[categoryId] || Package; // Fallback icon
-    return <IconComponent className="h-5 w-5 text-muted-foreground" />;
-  };
-
-
+const ProductTable: React.FC<ProductTableProps> = ({ products, onEdit, onDelete }) => {
   return (
     <Card className="shadow-lg">
       <CardHeader>
@@ -100,7 +86,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, categories, onEdi
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="flex items-center gap-1.5 w-fit">
-                        <CategoryIcon categoryId={product.categoryId} />
+                        <Tag className="h-4 w-4 text-muted-foreground" /> {/* Generic Tag icon */}
                         {product.categoryName || "Unknown"} 
                       </Badge>
                     </TableCell>

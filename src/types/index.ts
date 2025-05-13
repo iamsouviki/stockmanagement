@@ -3,6 +3,8 @@ import type { Timestamp } from 'firebase/firestore';
 export interface Category {
   id: string; // Firebase document ID
   name: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 export interface Product {
@@ -43,6 +45,7 @@ export interface Order {
   totalAmount: number;
   orderDate: Timestamp; // Firestore Timestamp
   createdAt?: Timestamp; // Firestore server timestamp
+  updatedAt?: Timestamp; // Firestore server timestamp
 }
 
 export interface BillItem extends Product { // Used for temporary bill construction on client
