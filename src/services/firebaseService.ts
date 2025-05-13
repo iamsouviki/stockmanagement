@@ -16,8 +16,8 @@ import {
   orderBy,
   limit,
   startAfter,
-  type FieldPath, // Import FieldPath
-  type OrderByDirection, // Import OrderByDirection
+  type FieldPath, 
+  type OrderByDirection, 
 } from 'firebase/firestore';
 import type { Product, Customer, Category, Order, OrderItemData } from '@/types';
 import { WALK_IN_CUSTOMER_ID } from '@/types'; 
@@ -76,7 +76,9 @@ const deleteDocument = async (collectionName: string, id: string): Promise<void>
 export const getCategories = () => getCollection<Category>('categories', 'name');
 export const addCategory = async (data: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>): Promise<Category> => {
   const id = await addDocument<Category>('categories', data);
-  return { id, ...data, createdAt: Timestamp.now(), updatedAt: Timestamp.now() }; 
+  // For immediate use, we create a client-side timestamp. Firestore will override with serverTimestamp.
+  const now = Timestamp.now();
+  return { id, ...data, createdAt: now, updatedAt: now }; 
 };
 export const updateCategory = (id: string, data: Partial<Omit<Category, 'id' | 'createdAt' | 'updatedAt'>>) => updateDocument<Category>('categories', id, data);
 export const deleteCategory = (id: string) => deleteDocument('categories', id);
@@ -90,8 +92,7 @@ export const findCategoryByNameOrCreate = async (name: string): Promise<Category
     return existingCategory;
   } else {
     const newCategoryData = { name: trimmedName };
-    const newCategoryId = await addDocument<Category>('categories', newCategoryData);
-    return { id: newCategoryId, name: trimmedName, createdAt: Timestamp.now(), updatedAt: Timestamp.now() }; 
+    return addCategory(newCategoryData); // Use the modified addCategory
   }
 };
 
@@ -153,12 +154,12 @@ export const addOrderAndDecrementStock = async (
   const now = new Date();
   const orderNumber = `ORD-${format(now, 'yyyyMMdd-HHmmssSSS')}`;
   
-  const completeOrderData: Omit<Order, 'id'> = {
+  const completeOrderData = { // Explicitly define to avoid passing undefined serverTimestamp directly
     ...orderData, 
     orderNumber,
     orderDate: Timestamp.fromDate(now),
-    createdAt: serverTimestamp() as Timestamp, 
-    updatedAt: serverTimestamp() as Timestamp,
+    createdAt: serverTimestamp(), // Firestore will set this as Timestamp
+    updatedAt: serverTimestamp(), // Firestore will set this as Timestamp
   };
 
   const newOrderRef = doc(collection(db, 'orders'));
@@ -180,6 +181,7 @@ export const addOrderAndDecrementStock = async (
   return newOrderRef.id;
 };
 
+
 export const updateOrderAndAdjustStock = async (
   orderId: string,
   updatedOrderPayload: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'>
@@ -192,9 +194,9 @@ export const updateOrderAndAdjustStock = async (
     throw new Error(`Order with ID ${orderId} not found for update.`);
   }
 
-  const stockAdjustments = new Map<string, number>(); // productId -> netStockChange
+  const stockAdjustments = new Map<string, number>(); // productId -> netStockChange (positive for return, negative for sale)
 
-  // Calculate stock returns from original items
+  // 1. Calculate stock to be returned from original items
   originalOrder.items.forEach(originalItem => {
     stockAdjustments.set(
       originalItem.productId,
@@ -202,47 +204,58 @@ export const updateOrderAndAdjustStock = async (
     );
   });
 
-  // Calculate stock decrements for updated items
+  // 2. Calculate stock to be decremented for updated items
   updatedOrderPayload.items.forEach(updatedItem => {
     stockAdjustments.set(
       updatedItem.productId,
       (stockAdjustments.get(updatedItem.productId) || 0) - updatedItem.billQuantity
     );
   });
+  
+  // 3. Apply stock adjustments to products
+  // This loop needs to be async if getDoc is inside, but batch updates are synchronous preparations.
+  // It's better to fetch all products first if needed, or assume client validated stock for new quantities.
+  // For simplicity in this batch, we'll fetch current stock for each product being adjusted.
+  const productRefsToUpdate: { ref: any, newStock: number }[] = [];
 
-  // Apply stock adjustments
   for (const [productId, netChange] of stockAdjustments.entries()) {
-    if (netChange === 0) continue;
+    if (netChange === 0) continue; // No change for this product
 
     const productRef = doc(db, 'products', productId);
-    // It's safer to read the product stock within the transaction/batch scope if possible,
-    // but Firestore batch writes don't support reads within them.
-    // We read before the batch, which is generally okay if concurrent edits are rare or handled.
-    // For high concurrency, a Firebase Function with a transaction would be more robust.
-    const productSnap = await getDoc(productRef);
+    const productSnap = await getDoc(productRef); 
+
     if (productSnap.exists()) {
       const currentStock = productSnap.data().quantity || 0;
-      const newStock = currentStock + netChange;
+      const newStock = currentStock + netChange; // netChange is +ve for return, -ve for sale
+
       if (newStock < 0) {
-        // This case should ideally be prevented by client-side validation
-        // based on real-time stock levels before submitting the edit.
-        console.error(`Stock for product ${productId} would become negative (${newStock}). Aborting stock update for this item.`);
-        // Decide error handling: throw, or skip this item's stock update, or log and continue
-        // For now, we proceed but log an error. A more robust solution might involve checks earlier.
-        // throw new Error(`Insufficient stock for product ${productSnap.data().name} after update.`);
+        // This should ideally be caught by client-side validation earlier
+        // If an item's new billQuantity > current actual stock, it's an issue.
+        throw new Error(`Insufficient stock for product ${productSnap.data().name} after update. New calculated stock would be ${newStock}.`);
       }
-       batch.update(productRef, { quantity: Math.max(0, newStock), updatedAt: serverTimestamp() });
+      productRefsToUpdate.push({ ref: productRef, newStock });
     } else {
-      console.warn(`Product with ID ${productId} not found for stock adjustment.`);
+      // If a product was in the original order but is now deleted, its stock can't be "returned".
+      // If a new product ID is in the updated order that doesn't exist, this is also an error.
+      console.warn(`Product with ID ${productId} not found during stock adjustment for order update.`);
     }
   }
+  
+  // Add product stock updates to the batch
+  productRefsToUpdate.forEach(p => {
+    batch.update(p.ref, { quantity: p.newStock, updatedAt: serverTimestamp() });
+  });
 
   // Update the order document itself
-  // We keep the original orderNumber and orderDate
-  batch.update(orderRef, {
+  // Keep original orderNumber and orderDate. Update customer details, items, totals, and updatedAt.
+  const finalOrderUpdatePayload = {
     ...updatedOrderPayload, // This includes new items, customer details, totals
     updatedAt: serverTimestamp(),
-  });
+    // Ensure orderNumber and orderDate are not overwritten if they are part of updatedOrderPayload by mistake
+    orderNumber: originalOrder.orderNumber,
+    orderDate: originalOrder.orderDate, 
+  };
+  batch.update(orderRef, finalOrderUpdatePayload);
 
   await batch.commit();
   return orderId;
