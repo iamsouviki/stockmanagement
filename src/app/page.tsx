@@ -181,7 +181,7 @@ export default function DashboardPage() {
                   </CardDescription>
                   <Button asChild variant="default" className="w-full sm:w-auto bg-primary hover:bg-primary/90">
                     <Link href="/settings/user-management">
-                      Go to User Management <ArrowRight className="ml-2 h-4 w-4" />
+                      Manage Users <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
                 </CardContent>
@@ -197,3 +197,4 @@ export default function DashboardPage() {
     </AuthGuard>
   );
 }
+
