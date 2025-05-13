@@ -7,6 +7,7 @@ import { auth } from '@/lib/firebase';
 import type { UserProfile } from '@/types';
 import { getUserProfile } from '@/services/userService';
 import { useRouter, usePathname } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast'; // Ensure toast is imported if used
 
 interface AuthContextType {
   currentUser: FirebaseUser | null;
@@ -20,59 +21,61 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Start true
   const router = useRouter();
   const pathname = usePathname();
+  const { toast } = useToast();
 
   useEffect(() => {
-    // console.log("AuthProvider: useEffect triggered. Pathname:", pathname);
+    // console.log("AuthProvider: Mounting. Initial isLoading:", isLoading);
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      // console.log("AuthProvider: onAuthStateChanged fired. User:", user ? user.uid : null);
-      setIsLoading(true); // Set loading true at the start of auth state processing
+      // console.log("AuthProvider: onAuthStateChanged triggered. User:", user ? user.uid : null);
+      setIsLoading(true); // Ensure loading is true while processing auth state
       if (user) {
         setCurrentUser(user);
         try {
           // console.log("AuthProvider: Fetching profile for UID:", user.uid);
           const profile = await getUserProfile(user.uid);
-          // console.log("AuthProvider: Profile fetched:", profile);
+          // console.log("AuthProvider: Profile fetched:", profile ? { id: profile.id, role: profile.role } : null);
           setUserProfile(profile);
+          if (!profile) {
+            // console.warn("AuthProvider: User profile is null for authenticated user:", user.uid);
+          }
         } catch (error) {
           console.error("AuthProvider: Error fetching user profile:", error);
           setUserProfile(null); 
         }
       } else {
+        // console.log("AuthProvider: No authenticated user.");
         setCurrentUser(null);
         setUserProfile(null);
       }
-      setIsLoading(false); // Set loading false after all processing
-      // console.log("AuthProvider: isLoading set to false. currentUser:", user ? user.uid : null, "userProfile:", userProfile ? userProfile.role : null);
+      setIsLoading(false); 
+      // console.log("AuthProvider: Finished processing auth state. isLoading:", false, "currentUser:", user ? user.uid : 'null', "userProfile:", userProfile ? userProfile.role : 'null');
     });
 
     return () => {
-      // console.log("AuthProvider: Unsubscribing from onAuthStateChanged.");
+      // console.log("AuthProvider: Unmounting. Unsubscribing from onAuthStateChanged.");
       unsubscribe();
     }
-  }, []); // Removed pathname and router from dependencies; onAuthStateChanged should only run once to set up listener.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array: runs once on mount, cleans up on unmount.
 
   const logout = async () => {
     // console.log("AuthProvider: Logout called.");
-    setIsLoading(true); // Indicate loading during logout
+    // setIsLoading(true); // No need, onAuthStateChanged will handle state updates
     try {
       await firebaseSignOut(auth);
       // currentUser and userProfile will be set to null by onAuthStateChanged
+      // which will also set isLoading appropriately.
       router.push('/login'); 
     } catch (error) {
       console.error("AuthProvider: Error signing out:", error);
       toast({ title: "Logout Failed", description: "Could not sign out. Please try again.", variant: "destructive" });
-    } finally {
-      // setIsLoading(false); // onAuthStateChanged will handle setting isLoading to false
+      // setIsLoading(false); // Not needed here
     }
   };
   
-  // Add a toast import if you uncomment the toast line above
-  // import { toast } from '@/hooks/use-toast';
-
-
   return (
     <AuthContext.Provider value={{ currentUser, userProfile, isLoading, logout }}>
       {children}

@@ -32,49 +32,62 @@ export default function AuthGuard({ children, allowedRoles, redirectPath = '/log
   const [isAuthorizedToRender, setIsAuthorizedToRender] = useState(false);
 
   useEffect(() => {
-    // console.log(`AuthGuard (${pathname}): Effect triggered. AuthLoading: ${isAuthLoading}, CurrentUser: ${!!currentUser}, UserProfile: ${!!userProfile}`);
-    
+    // Default to not authorized until checks pass
+    let newAuthorizedState = false; 
+    // console.log(
+    //   `AuthGuard (${pathname}): Effect run. AuthLoading: ${isAuthLoading}, ` +
+    //   `CurrentUser: ${currentUser ? currentUser.uid : 'null'}, ` +
+    //   `UserProfile: ${userProfile ? userProfile.role : 'null'}, ` +
+    //   `AllowedRoles: ${allowedRoles?.join(',')}, ` +
+    //   `Current isAuthorizedToRender: ${isAuthorizedToRender}`
+    // );
+
     if (isAuthLoading) {
-      // console.log(`AuthGuard (${pathname}): Auth is loading. Setting isAuthorizedToRender to false.`);
-      setIsAuthorizedToRender(false);
-      return;
-    }
-
-    if (!currentUser) {
-      // console.log(`AuthGuard (${pathname}): No current user.`);
-      if (pathname !== redirectPath) {
-        // console.log(`AuthGuard (${pathname}): Not on redirect path. Redirecting to ${redirectPath}.`);
-        router.replace(redirectPath);
+      // console.log(`AuthGuard (${pathname}): Auth is loading. Not authorizing render yet.`);
+      // newAuthorizedState remains false
+    } else {
+      // Auth loading is false, proceed with checks
+      if (!currentUser) {
+        // console.log(`AuthGuard (${pathname}): No current user.`);
+        if (pathname !== redirectPath) {
+          // console.log(`AuthGuard (${pathname}): Not on redirect path. Redirecting to ${redirectPath}.`);
+          router.replace(redirectPath);
+          // newAuthorizedState remains false (skeleton shown during redirect)
+        } else {
+          // console.log(`AuthGuard (${pathname}): On redirect path (${redirectPath}). Authorizing render (e.g., LoginForm).`);
+          newAuthorizedState = true; // On login page, allow rendering children (LoginForm)
+        }
       } else {
-        // console.log(`AuthGuard (${pathname}): On redirect path (${redirectPath}), user not logged in. LoginForm should handle display.`);
-        // If on login page, and no user, login form should be shown by the LoginPage itself.
-        // If children of AuthGuard on login page is LoginForm, this path allows it to render.
-        setIsAuthorizedToRender(true); 
-      }
-      return;
-    }
-
-    // User is authenticated (currentUser exists)
-    if (allowedRoles && allowedRoles.length > 0) {
-      // console.log(`AuthGuard (${pathname}): Roles required: ${allowedRoles.join(', ')}.`);
-      if (!userProfile) {
-        // console.warn(`AuthGuard (${pathname}): User authenticated but profile is null. Cannot check roles. Redirecting to /.`);
-        if (pathname !== '/') router.replace('/');
-        else setIsAuthorizedToRender(false); // Avoid self-redirect loop if on '/' and profile is missing
-        return;
-      }
-      if (!allowedRoles.includes(userProfile.role)) {
-        // console.warn(`AuthGuard (${pathname}): User role '${userProfile.role}' not in allowed roles: ${allowedRoles.join(', ')}. Redirecting to /.`);
-        if (pathname !== '/') router.replace('/');
-        else setIsAuthorizedToRender(false); // Avoid self-redirect loop
-        return;
+        // User is authenticated (currentUser exists)
+        // console.log(`AuthGuard (${pathname}): User ${currentUser.uid} is authenticated.`);
+        if (allowedRoles && allowedRoles.length > 0) {
+          // console.log(`AuthGuard (${pathname}): Roles required: ${allowedRoles.join(', ')}.`);
+          if (!userProfile) {
+            // console.warn(`AuthGuard (${pathname}): User authenticated but profile is null. Cannot check roles. Redirecting to /.`);
+            if (pathname !== '/') router.replace('/'); // Or a specific "unauthorized" page
+            // newAuthorizedState remains false
+          } else if (!allowedRoles.includes(userProfile.role)) {
+            // console.warn(`AuthGuard (${pathname}): User role '${userProfile.role}' not in allowed roles: ${allowedRoles.join(', ')}. Redirecting to /.`);
+            if (pathname !== '/') router.replace('/'); // Or a specific "unauthorized" page
+            // newAuthorizedState remains false
+          } else {
+            // console.log(`AuthGuard (${pathname}): User role '${userProfile.role}' is allowed. Authorizing render.`);
+            newAuthorizedState = true; // Role check passed
+          }
+        } else {
+          // No specific roles required, user is authenticated
+          // console.log(`AuthGuard (${pathname}): No specific roles required. Authorizing render.`);
+          newAuthorizedState = true;
+        }
       }
     }
     
-    // console.log(`AuthGuard (${pathname}): Authorization checks passed. Setting isAuthorizedToRender to true.`);
-    setIsAuthorizedToRender(true);
+    if (isAuthorizedToRender !== newAuthorizedState) {
+      setIsAuthorizedToRender(newAuthorizedState);
+    }
 
-  }, [currentUser, userProfile, isAuthLoading, router, allowedRoles, redirectPath, pathname]);
+  }, [currentUser, userProfile, isAuthLoading, router, allowedRoles, redirectPath, pathname, isAuthorizedToRender]);
+
 
   if (isAuthLoading) {
     // console.log(`AuthGuard (${pathname}): Rendering PageSkeleton because isAuthLoading is true.`);
@@ -85,8 +98,8 @@ export default function AuthGuard({ children, allowedRoles, redirectPath = '/log
     // console.log(`AuthGuard (${pathname}): Rendering children because isAuthorizedToRender is true.`);
     return <>{children}</>;
   }
-
-  // If not AuthLoading and not AuthorizedToRender, means a redirect is likely pending or conditions not met.
+  
+  // This state means: not loading, but not yet authorized to render (e.g., redirect is pending, or checks failed)
   // console.log(`AuthGuard (${pathname}): Rendering PageSkeleton as fallback (not loading, not authorized to render).`);
   return <PageSkeleton />;
 }
