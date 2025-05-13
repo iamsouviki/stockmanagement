@@ -1,43 +1,52 @@
-{
-  "rules": {
-    "users": {
-      "$uid": {
-        // Authenticated users can read their own user document to get their role
-        ".read": "auth != null && auth.uid == $uid",
-        // Roles should ideally be managed by an admin/owner.
-        // User can update their profile if other fields are added, but not their role directly.
-        ".write": "auth != null && auth.uid == $uid && !('role' in request.resource.data)"
-      }
-    },
-    "categories": {
-      // All authenticated users can read categories
-      ".read": "auth != null",
-      // Owner and Employee can create, update, delete categories
-      ".write": "auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'employee']"
-    },
-    "products": {
-      ".read": "auth != null",
-      // Owner and Employee can create, update, delete products
-      ".write": "auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'employee']"
-    },
-    "customers": {
-      ".read": "auth != null",
-      // Owner and Employee can create, update, delete customers
-      ".write": "auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'employee']"
-    },
-    "orders": {
-      // All authenticated users can read orders (for history)
-      ".read": "auth != null",
-      // Creating orders (billing) should be allowed for employees and owners
-      ".create": "request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'employee']",
-      "$orderId": {
-        // Reading specific order is fine for any authenticated user
-        ".read": "auth != null",
-        // Only owner can modify orders (update).
-        ".update": "auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner'",
-        // Deletion of orders is generally not a good practice.
-        ".delete": "false"
-      }
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read and write access to all collections for authenticated users
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Example of more specific rules (you'll need to customize these)
+    // Match any document in the 'users' collection
+    match /users/{userId} {
+      // Allow a user to read and write their own profile
+      allow read, update, delete: if request.auth != null && request.auth.uid == userId;
+      // Allow authenticated users to create their own profile
+      allow create: if request.auth != null;
+    }
+
+    // Match any document in the 'products' collection
+    match /products/{productId} {
+      // Allow authenticated users to read products
+      allow read: if request.auth != null;
+      // Allow specific roles (e.g., 'owner', 'admin', 'employee') to create, update, delete products
+      allow create, update, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
+    }
+
+    // Match any document in the 'categories' collection
+    match /categories/{categoryId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
+    }
+
+    // Match any document in the 'customers' collection
+    match /customers/{customerId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
+    }
+    
+    // Match any document in the 'orders' collection
+    match /orders/{orderId} {
+        // Allow users to read their own orders, or if they are admin/owner/employee
+        allow read: if request.auth != null && (request.auth.uid == resource.data.customerId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee']);
+        // Allow authenticated users (typically employees, admins, owners) to create orders
+        allow create: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
+        // Allow only owners to update orders (or specific fields if needed)
+        allow update: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
+        // Deleting orders might be restricted
+        allow delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
     }
   }
 }
