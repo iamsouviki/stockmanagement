@@ -1,24 +1,29 @@
+
 "use client";
 
 import type { BillItem } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { FileText } from 'lucide-react';
+import { FileText, Edit3 } from 'lucide-react'; // Added Edit3 for potential update icon
 
 interface BillSummaryCardProps {
   items: BillItem[];
   onFinalizeBill: () => void;
+  finalizeButtonText?: string; // Added prop
 }
 
-const BillSummaryCard: React.FC<BillSummaryCardProps> = ({ items, onFinalizeBill }) => {
+const BillSummaryCard: React.FC<BillSummaryCardProps> = ({ items, onFinalizeBill, finalizeButtonText = "Finalize & Generate Bill" }) => {
   const subtotal = items.reduce((sum, item) => sum + item.price * item.billQuantity, 0);
-  const taxRate = 0.18; // Updated tax rate to 18%
+  const taxRate = 0.18; 
   const taxAmount = subtotal * taxRate;
   const totalAmount = subtotal + taxAmount;
 
+  const ButtonIcon = finalizeButtonText.toLowerCase().includes("update") ? Edit3 : FileText;
+
+
   return (
-    <Card className="shadow-lg lg:sticky lg:top-20"> {/* Sticky for visibility while scrolling items on large screens */}
+    <Card className="shadow-lg lg:sticky lg:top-20"> 
       <CardHeader>
         <CardTitle className="text-lg sm:text-xl text-primary">Bill Summary</CardTitle>
         <CardDescription className="text-sm sm:text-base">Review the total amount before finalizing.</CardDescription>
@@ -43,9 +48,9 @@ const BillSummaryCard: React.FC<BillSummaryCardProps> = ({ items, onFinalizeBill
           onClick={onFinalizeBill} 
           className="w-full bg-primary hover:bg-primary/90" 
           disabled={items.length === 0}
-          size="lg" // Make button slightly larger
+          size="lg" 
         >
-          <FileText className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> Finalize & Generate Bill
+          <ButtonIcon className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> {finalizeButtonText}
         </Button>
       </CardFooter>
     </Card>

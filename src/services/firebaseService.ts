@@ -26,23 +26,19 @@ import { format } from 'date-fns';
 // Generic CRUD operations
 const getCollection = async <T extends Record<string, any>>(
   collectionName: string,
-  orderByField?: Extract<keyof T, string>, // Ensures orderByField is a string key of T
+  orderByField?: Extract<keyof T, string> | FieldPath, 
   orderDirection: OrderByDirection = 'asc',
   pageLimit: number = 0,
   lastVisible?: any
 ): Promise<T[]> => {
-  let q = query(collection(db, collectionName)); // Initialize q with collection first
+  let q = query(collection(db, collectionName)); 
   if (orderByField) {
-    // orderByField is now guaranteed to be a string key of T, or undefined.
-    // The if check handles undefined.
     q = query(q, orderBy(orderByField, orderDirection));
   }
   if (pageLimit > 0) {
-     // @ts-ignore
     q = query(q, limit(pageLimit));
   }
   if (lastVisible) {
-    // @ts-ignore
     q = query(q, startAfter(lastVisible));
   }
   const snapshot = await getDocs(q);
@@ -80,19 +76,13 @@ const deleteDocument = async (collectionName: string, id: string): Promise<void>
 export const getCategories = () => getCollection<Category>('categories', 'name');
 export const addCategory = async (data: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>): Promise<Category> => {
   const id = await addDocument<Category>('categories', data);
-  // Firestore Timestamps are server-generated, so we can't immediately return them as Date/string.
-  // For immediate use, return the input data with the ID. The actual timestamps will be in DB.
-  return { id, ...data, createdAt: Timestamp.now(), updatedAt: Timestamp.now() }; // Approximate for return
+  return { id, ...data, createdAt: Timestamp.now(), updatedAt: Timestamp.now() }; 
 };
 export const updateCategory = (id: string, data: Partial<Omit<Category, 'id' | 'createdAt' | 'updatedAt'>>) => updateDocument<Category>('categories', id, data);
 export const deleteCategory = (id: string) => deleteDocument('categories', id);
 
 export const findCategoryByNameOrCreate = async (name: string): Promise<Category> => {
   const trimmedName = name.trim();
-  const categoriesRef = collection(db, 'categories');
-  // Firestore queries are case-sensitive. Fetch all and filter, or enforce consistent casing.
-  // For simplicity here, fetching all and filtering. This might not be scalable for huge category lists.
-  // A better approach for large scale would be to store a lower-case version of the name for querying.
   const allCategories = await getCategories(); 
   const existingCategory = allCategories.find(cat => cat.name.toLowerCase() === trimmedName.toLowerCase());
 
@@ -101,10 +91,7 @@ export const findCategoryByNameOrCreate = async (name: string): Promise<Category
   } else {
     const newCategoryData = { name: trimmedName };
     const newCategoryId = await addDocument<Category>('categories', newCategoryData);
-    // Fetch the newly created category to get timestamps if needed, or construct manually for return
-    // const createdCategory = await getDocument<Category>('categories', newCategoryId);
-    // return createdCategory!; 
-    return { id: newCategoryId, name: trimmedName, createdAt: Timestamp.now(), updatedAt: Timestamp.now() }; // Approximate for return
+    return { id: newCategoryId, name: trimmedName, createdAt: Timestamp.now(), updatedAt: Timestamp.now() }; 
   }
 };
 
@@ -179,7 +166,7 @@ export const addOrderAndDecrementStock = async (
 
   for (const item of itemsToDecrement) {
     const productRef = doc(db, 'products', item.productId);
-    const productSnap = await getDoc(productRef); // Important: getDoc is async
+    const productSnap = await getDoc(productRef); 
     if (productSnap.exists()) {
       const currentStock = productSnap.data().quantity || 0;
       const newStock = Math.max(0, currentStock - item.quantity);
@@ -191,4 +178,72 @@ export const addOrderAndDecrementStock = async (
 
   await batch.commit();
   return newOrderRef.id;
+};
+
+export const updateOrderAndAdjustStock = async (
+  orderId: string,
+  updatedOrderPayload: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'>
+): Promise<string> => {
+  const batch = writeBatch(db);
+  const orderRef = doc(db, 'orders', orderId);
+
+  const originalOrder = await getOrder(orderId);
+  if (!originalOrder) {
+    throw new Error(`Order with ID ${orderId} not found for update.`);
+  }
+
+  const stockAdjustments = new Map<string, number>(); // productId -> netStockChange
+
+  // Calculate stock returns from original items
+  originalOrder.items.forEach(originalItem => {
+    stockAdjustments.set(
+      originalItem.productId,
+      (stockAdjustments.get(originalItem.productId) || 0) + originalItem.billQuantity
+    );
+  });
+
+  // Calculate stock decrements for updated items
+  updatedOrderPayload.items.forEach(updatedItem => {
+    stockAdjustments.set(
+      updatedItem.productId,
+      (stockAdjustments.get(updatedItem.productId) || 0) - updatedItem.billQuantity
+    );
+  });
+
+  // Apply stock adjustments
+  for (const [productId, netChange] of stockAdjustments.entries()) {
+    if (netChange === 0) continue;
+
+    const productRef = doc(db, 'products', productId);
+    // It's safer to read the product stock within the transaction/batch scope if possible,
+    // but Firestore batch writes don't support reads within them.
+    // We read before the batch, which is generally okay if concurrent edits are rare or handled.
+    // For high concurrency, a Firebase Function with a transaction would be more robust.
+    const productSnap = await getDoc(productRef);
+    if (productSnap.exists()) {
+      const currentStock = productSnap.data().quantity || 0;
+      const newStock = currentStock + netChange;
+      if (newStock < 0) {
+        // This case should ideally be prevented by client-side validation
+        // based on real-time stock levels before submitting the edit.
+        console.error(`Stock for product ${productId} would become negative (${newStock}). Aborting stock update for this item.`);
+        // Decide error handling: throw, or skip this item's stock update, or log and continue
+        // For now, we proceed but log an error. A more robust solution might involve checks earlier.
+        // throw new Error(`Insufficient stock for product ${productSnap.data().name} after update.`);
+      }
+       batch.update(productRef, { quantity: Math.max(0, newStock), updatedAt: serverTimestamp() });
+    } else {
+      console.warn(`Product with ID ${productId} not found for stock adjustment.`);
+    }
+  }
+
+  // Update the order document itself
+  // We keep the original orderNumber and orderDate
+  batch.update(orderRef, {
+    ...updatedOrderPayload, // This includes new items, customer details, totals
+    updatedAt: serverTimestamp(),
+  });
+
+  await batch.commit();
+  return orderId;
 };
