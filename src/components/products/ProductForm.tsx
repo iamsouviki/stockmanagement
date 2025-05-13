@@ -21,16 +21,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Product, Category } from "@/types";
-// import { mockCategories } from "@/data/mockData"; // Remove mockCategories
 
 const productSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters."),
-  serialNumber: z.string().min(5, "Serial number must be at least 5 characters."),
-  barcode: z.string().min(5, "Barcode must be at least 5 characters."),
+  name: z.string().min(2, "Name must be at least 2 characters.").max(100, "Name must be 100 characters or less."),
+  serialNumber: z.string().min(3, "Serial number must be at least 3 characters.").max(50, "Serial number must be 50 characters or less."),
+  barcode: z.string().min(3, "Barcode must be at least 3 characters.").max(50, "Barcode must be 50 characters or less."),
   price: z.coerce.number().min(0.01, "Price must be greater than 0."),
   quantity: z.coerce.number().int().min(0, "Quantity cannot be negative."),
   categoryId: z.string().min(1, "Category is required."),
-  // imageUrl and imageHint are not part of the form directly, handled on product creation
 });
 
 export type ProductFormData = z.infer<typeof productSchema>;
@@ -39,7 +37,7 @@ interface ProductFormProps {
   product?: Product | null;
   onSubmit: (data: ProductFormData) => void;
   onCancel: () => void;
-  categories: Category[]; // Receive categories as a prop
+  categories: Category[]; 
 }
 
 const ProductForm: React.FC<ProductFormProps> = ({ product, onSubmit, onCancel, categories }) => {
@@ -64,11 +62,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSubmit, onCancel, 
         },
   });
 
-  // const categories: Category[] = mockCategories; // Use passed prop
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
         <FormField
           control={form.control}
           name="name"
@@ -108,13 +105,13 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSubmit, onCancel, 
             </FormItem>
           )}
         />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           <FormField
             control={form.control}
             name="price"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Price</FormLabel>
+                <FormLabel>Price (₹)</FormLabel>
                 <FormControl>
                   <Input type="number" step="0.01" placeholder="0.00" {...field} />
                 </FormControl>
@@ -142,10 +139,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSubmit, onCancel, 
           render={({ field }) => (
             <FormItem>
               <FormLabel>Category</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={categories.length === 0}>
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a category" />
+                    <SelectValue placeholder={categories.length > 0 ? "Select a category" : "No categories available"} />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
@@ -160,11 +157,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSubmit, onCancel, 
             </FormItem>
           )}
         />
-        <div className="flex justify-end space-x-3 pt-4">
-          <Button type="button" variant="outline" onClick={onCancel}>
+        <div className="flex flex-col sm:flex-row justify-end gap-2 sm:space-x-3 pt-2 sm:pt-4">
+          <Button type="button" variant="outline" onClick={onCancel} className="w-full sm:w-auto">
             Cancel
           </Button>
-          <Button type="submit" className="bg-primary hover:bg-primary/90">
+          <Button type="submit" className="w-full sm:w-auto bg-primary hover:bg-primary/90">
             {product ? "Update Product" : "Add Product"}
           </Button>
         </div>

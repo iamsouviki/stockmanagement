@@ -18,12 +18,12 @@ const BillSummaryCard: React.FC<BillSummaryCardProps> = ({ items, onFinalizeBill
   const totalAmount = subtotal + taxAmount;
 
   return (
-    <Card className="shadow-lg sticky top-20"> {/* Sticky for visibility while scrolling items */}
+    <Card className="shadow-lg lg:sticky lg:top-20"> {/* Sticky for visibility while scrolling items on large screens */}
       <CardHeader>
-        <CardTitle className="text-xl text-primary">Bill Summary</CardTitle>
-        <CardDescription>Review the total amount before finalizing.</CardDescription>
+        <CardTitle className="text-lg sm:text-xl text-primary">Bill Summary</CardTitle>
+        <CardDescription className="text-sm sm:text-base">Review the total amount before finalizing.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-2 sm:space-y-3 text-sm sm:text-base">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Subtotal:</span>
           <span className="font-medium">₹{subtotal.toFixed(2)}</span>
@@ -33,7 +33,7 @@ const BillSummaryCard: React.FC<BillSummaryCardProps> = ({ items, onFinalizeBill
           <span className="font-medium">₹{taxAmount.toFixed(2)}</span>
         </div>
         <Separator />
-        <div className="flex justify-between text-lg font-semibold">
+        <div className="flex justify-between text-md sm:text-lg font-semibold">
           <span className="text-foreground">Total Amount:</span>
           <span className="text-primary">₹{totalAmount.toFixed(2)}</span>
         </div>
@@ -43,8 +43,9 @@ const BillSummaryCard: React.FC<BillSummaryCardProps> = ({ items, onFinalizeBill
           onClick={onFinalizeBill} 
           className="w-full bg-primary hover:bg-primary/90" 
           disabled={items.length === 0}
+          size="lg" // Make button slightly larger
         >
-          <FileText className="mr-2 h-5 w-5" /> Finalize & Generate Bill
+          <FileText className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> Finalize & Generate Bill
         </Button>
       </CardFooter>
     </Card>

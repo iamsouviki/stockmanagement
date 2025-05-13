@@ -24,24 +24,24 @@ const BarcodeEntry: React.FC<BarcodeEntryProps> = ({ onProductAdd }) => {
   return (
     <Card className="shadow-md">
       <CardHeader>
-        <CardTitle className="text-xl text-primary">Add Product to Bill</CardTitle>
-        <CardDescription>Enter barcode or serial number to add a product.</CardDescription>
+        <CardTitle className="text-lg sm:text-xl text-primary">Add Product to Bill</CardTitle>
+        <CardDescription className="text-sm sm:text-base">Enter barcode or serial number to add a product.</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
+        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <Input
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Enter Barcode or Serial Number"
             aria-label="Barcode or Serial Number"
-            className="flex-grow"
+            className="flex-grow text-sm sm:text-base"
           />
-          <Button type="submit" className="bg-accent hover:bg-accent/90 text-accent-foreground w-full sm:w-auto">
-            <ScanLine className="mr-2 h-5 w-5" /> Add Item
+          <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
+            <ScanLine className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> Add Item
           </Button>
         </form>
-         <p className="mt-3 text-sm text-muted-foreground">
+         <p className="mt-2 text-xs sm:text-sm text-muted-foreground">
             Note: This is a mockup. Actual camera scanning is not implemented.
           </p>
       </CardContent>

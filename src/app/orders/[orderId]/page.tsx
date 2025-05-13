@@ -10,12 +10,13 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Copy, Printer } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
-import { Timestamp } from 'firebase/firestore'; // Firebase Timestamp
+import { Timestamp } from 'firebase/firestore'; 
 import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
 import Logo from '@/components/icons/Logo';
 import { storeDetails } from '@/config/storeDetails';
 import { generateInvoicePdf } from '@/lib/pdfGenerator'; 
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 export default function OrderDetailPage() {
   const params = useParams();
@@ -50,55 +51,47 @@ export default function OrderDetailPage() {
 
   const formatDate = (dateValue: Timestamp | string | Date | undefined | null) => {
     if (!dateValue) return 'N/A';
+    let dateToFormat: Date;
 
-    if (dateValue instanceof Timestamp) { // Check for Firebase Timestamp
+    if (dateValue instanceof Timestamp) {
       try {
-        return format(dateValue.toDate(), 'PPpp');
+        dateToFormat = dateValue.toDate();
       } catch (e) {
-        console.error("Error formatting Firestore Timestamp in OrderDetailPage:", e, dateValue);
+        console.error("Error converting Firestore Timestamp in OrderDetailPage:", e, dateValue);
         return 'Invalid Date';
       }
-    }
-    
-    if (dateValue instanceof Date) {
+    } else if (dateValue instanceof Date) {
+      dateToFormat = dateValue;
+    } else if (typeof dateValue === 'string') {
       try {
-        if (isNaN(dateValue.getTime())) {
-             console.warn("Invalid Date object in OrderDetailPage:", dateValue);
-             return 'Invalid Date';
-        }
-        return format(dateValue, 'PPpp');
-      } catch (e) {
-        console.error("Error formatting Date object in OrderDetailPage:", e, dateValue);
+        dateToFormat = new Date(dateValue);
+      } catch(e) {
+        console.error("Error parsing date string in OrderDetailPage:", e, dateValue);
         return 'Invalid Date';
       }
-    }
-
-    if (typeof dateValue === 'string') {
-      try {
-        const parsedDate = new Date(dateValue);
-        if (isNaN(parsedDate.getTime())) {
-          console.warn("Invalid date string in OrderDetailPage:", dateValue);
-          return 'Invalid Date';
-        }
-        return format(parsedDate, 'PPpp');
-      } catch (e) {
-        console.error("Error formatting date string in OrderDetailPage:", e, dateValue);
-        return 'Invalid Date';
-      }
-    }
-    
-    // Fallback for plain objects that might have a toDate method
-     if (typeof (dateValue as any)?.toDate === 'function') {
+    } else if (typeof (dateValue as any)?.toDate === 'function') {
        try {
-         return format((dateValue as any).toDate(), 'PPpp');
+         dateToFormat = (dateValue as any).toDate();
        } catch (e) {
           console.error("Error formatting object with toDate() in OrderDetailPage:", e, dateValue);
           return 'Invalid Date';
        }
      }
-
-    console.warn("Unformattable dateValue in OrderDetailPage:", dateValue);
-    return 'N/A';
+    else {
+      console.warn("Unformattable dateValue type in OrderDetailPage:", typeof dateValue, dateValue);
+      return 'N/A';
+    }
+    
+    try {
+      if (isNaN(dateToFormat.getTime())) {
+           console.warn("Invalid Date object after conversion in OrderDetailPage:", dateToFormat, "Original:", dateValue);
+           return 'Invalid Date';
+      }
+      return format(dateToFormat, 'PPpp');
+    } catch (e) {
+      console.error("Error formatting final Date object in OrderDetailPage:", e, dateToFormat);
+      return 'Invalid Date';
+    }
   };
 
   const handlePrintOrderPDF = (currentOrder: Order) => {
@@ -143,86 +136,89 @@ export default function OrderDetailPage() {
   }
 
   if (!order) {
-    return <p>Order not found.</p>;
+    return <p className="text-center text-lg">Order not found.</p>;
   }
 
   return (
     <div className="space-y-6">
-      <Button variant="outline" onClick={() => router.back()}>
+      <Button variant="outline" onClick={() => router.back()} size="sm">
         <ArrowLeft className="mr-2 h-4 w-4" /> Back to Orders
       </Button>
 
       <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-2xl text-primary">Order Details: {order.orderNumber}</CardTitle>
-          <CardDescription>Date: {formatDate(order.orderDate)}</CardDescription>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-xl sm:text-2xl text-primary">Order Details: {order.orderNumber}</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Date: {formatDate(order.orderDate)}</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 p-4 sm:p-6 text-sm sm:text-base">
           <div>
-            <h3 className="font-semibold text-lg">Customer Information</h3>
+            <h3 className="font-semibold text-md sm:text-lg mb-1">Customer Information</h3>
             <p>Name: {order.customerName}</p>
             <p>Mobile: {order.customerMobile}</p>
-            <p>Address: {order.customerAddress || 'N/A'}</p>
+            <p className="whitespace-normal break-words">Address: {order.customerAddress || 'N/A'}</p>
           </div>
           <div>
-            <h3 className="font-semibold text-lg">Items Ordered</h3>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[60px]">Image</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>SN/Barcode</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead className="text-center">Quantity</TableHead>
-                  <TableHead className="text-right">Subtotal</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {order.items.map((item, index) => (
-                  <TableRow key={item.productId + index}>
-                    <TableCell>
-                      {item.imageUrl ? (
-                        <Image
-                          src={item.imageUrl}
-                          alt={item.name}
-                          width={40}
-                          height={40}
-                          className="rounded-md object-cover"
-                          data-ai-hint={item.imageHint || "product item"}
-                        />
-                      ) : (
-                        <div className="w-10 h-10 bg-secondary rounded-md flex items-center justify-center overflow-hidden">
-                           <Logo className="h-full w-auto p-1" />
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>{item.name}</TableCell>
-                    <TableCell>{item.serialNumber || item.barcode || 'N/A'}</TableCell>
-                    <TableCell className="text-right">₹{item.price.toFixed(2)}</TableCell>
-                    <TableCell className="text-center">{item.billQuantity}</TableCell>
-                    <TableCell className="text-right">₹{(item.price * item.billQuantity).toFixed(2)}</TableCell>
+            <h3 className="font-semibold text-md sm:text-lg mb-2">Items Ordered</h3>
+            <ScrollArea className="w-full whitespace-nowrap rounded-md border">
+              <Table className="min-w-[600px] sm:min-w-full">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px] sm:w-[60px] px-2 sm:px-4">Image</TableHead>
+                    <TableHead className="px-2 sm:px-4">Product</TableHead>
+                    <TableHead className="px-2 sm:px-4">SN/Barcode</TableHead>
+                    <TableHead className="text-right px-2 sm:px-4">Price</TableHead>
+                    <TableHead className="text-center px-2 sm:px-4">Quantity</TableHead>
+                    <TableHead className="text-right px-2 sm:px-4">Subtotal</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {order.items.map((item, index) => (
+                    <TableRow key={item.productId + index}>
+                      <TableCell className="px-2 sm:px-4">
+                        {item.imageUrl ? (
+                          <Image
+                            src={item.imageUrl}
+                            alt={item.name}
+                            width={32}
+                            height={32}
+                            className="rounded-md object-cover sm:w-10 sm:h-10"
+                            data-ai-hint={item.imageHint || "product item"}
+                          />
+                        ) : (
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-secondary rounded-md flex items-center justify-center overflow-hidden">
+                             <Logo className="h-full w-auto p-0.5 sm:p-1" />
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs sm:text-sm px-2 sm:px-4 whitespace-normal break-words max-w-[120px] sm:max-w-xs">{item.name}</TableCell>
+                      <TableCell className="text-xs sm:text-sm px-2 sm:px-4 whitespace-normal break-words">{item.serialNumber || item.barcode || 'N/A'}</TableCell>
+                      <TableCell className="text-right text-xs sm:text-sm px-2 sm:px-4">₹{item.price.toFixed(2)}</TableCell>
+                      <TableCell className="text-center text-xs sm:text-sm px-2 sm:px-4">{item.billQuantity}</TableCell>
+                      <TableCell className="text-right text-xs sm:text-sm px-2 sm:px-4">₹{(item.price * item.billQuantity).toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
           </div>
-          <div className="text-right space-y-1 pr-4">
+          <div className="text-right space-y-1 pr-2 sm:pr-4">
             <p>
               Subtotal: <span className="font-semibold">₹{order.subtotal.toFixed(2)}</span>
             </p>
             <p>
               GST: <span className="font-semibold">₹{order.taxAmount.toFixed(2)}</span>
             </p>
-            <p className="text-xl font-bold">
+            <p className="text-lg sm:text-xl font-bold">
               Total: <span className="text-primary">₹{order.totalAmount.toFixed(2)}</span>
             </p>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-end space-x-3">
-          <Button variant="outline" onClick={() => handlePrintOrderPDF(order)}>
+        <CardFooter className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 p-4 sm:p-6">
+          <Button variant="outline" onClick={() => handlePrintOrderPDF(order)} className="w-full sm:w-auto">
             <Printer className="mr-2 h-4 w-4" /> Print Bill
           </Button>
-          <Button onClick={() => router.push(`/billing?fromOrder=${order.id}`)} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+          <Button onClick={() => router.push(`/billing?fromOrder=${order.id}`)} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
             <Copy className="mr-2 h-4 w-4" /> Re-create Bill
           </Button>
         </CardFooter>

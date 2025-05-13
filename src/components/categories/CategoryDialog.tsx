@@ -31,12 +31,12 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto p-6 shadow-xl rounded-lg">
+      <DialogContent className="w-full max-w-md sm:max-w-lg md:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-semibold text-primary">
+          <DialogTitle className="text-xl sm:text-2xl font-semibold text-primary">
             {category ? "Edit Category" : "Add New Category"}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs sm:text-sm">
             {category
               ? "Update the name for this category."
               : "Enter the name for the new category."}
@@ -47,7 +47,6 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
           onSubmit={handleSubmit}
           onCancel={() => onOpenChange(false)}
         />
-        {/* Footer can be part of CategoryForm or here, let's keep it in form for now */}
       </DialogContent>
     </Dialog>
   );

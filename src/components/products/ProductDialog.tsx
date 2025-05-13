@@ -27,17 +27,17 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
 }) => {
   const handleSubmit = (data: ProductFormData) => {
     onSubmit(data);
-    onOpenChange(false);
+    // onOpenChange(false); // Parent component handles dialog closing
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto p-6 shadow-xl rounded-lg">
+      <DialogContent className="w-full max-w-md sm:max-w-lg md:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-semibold text-primary">
+          <DialogTitle className="text-xl sm:text-2xl font-semibold text-primary">
             {product ? "Edit Product" : "Add New Product"}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs sm:text-sm">
             {product
               ? "Update the details of this product."
               : "Fill in the details to add a new product to your inventory."}

@@ -33,12 +33,12 @@ const CustomerDialog: React.FC<CustomerDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto p-6 shadow-xl rounded-lg">
+      <DialogContent className="w-full max-w-md sm:max-w-lg md:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-semibold text-primary">
+          <DialogTitle className="text-xl sm:text-2xl font-semibold text-primary">
             {customer ? "Edit Customer" : "Add New Customer"}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-xs sm:text-sm">
             {customer
               ? "Update the details for this customer."
               : "Fill in the details to add a new customer."}

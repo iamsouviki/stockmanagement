@@ -12,7 +12,7 @@ import type { CustomerFormData } from '@/components/customers/CustomerForm';
 import CustomerDialog from '@/components/customers/CustomerDialog';
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, UserSearch, PlusCircle } from "lucide-react";
+import { Terminal, UserSearch, PlusCircle, Info } from "lucide-react";
 // import jsPDF from 'jspdf'; // No longer directly used here
 // import { format } from 'date-fns'; // No longer directly used here for PDF
 import { getProducts, addOrderAndDecrementStock, getOrder as getOrderById, findCustomerByMobile, getCustomer as getCustomerById, addCustomer } from '@/services/firebaseService';
@@ -194,6 +194,7 @@ export default function BillingPageContent() {
     if (!term) {
       setFoundCustomers([]);
       setSearchedMobileForNotFound(null);
+      setSelectedCustomer(null); // Clear selected customer if search term is empty
       return;
     }
     setIsSearchingCustomer(true);
@@ -204,6 +205,10 @@ export default function BillingPageContent() {
       if (customers.length === 0) {
         toast({ title: "No Customer Found", description: "No customer with this mobile. You can add them." });
         setSearchedMobileForNotFound(term);
+        setSelectedCustomer(null); // Clear selected customer if not found
+      } else if (customers.length === 1) {
+        // If only one customer is found, auto-select them.
+        handleSelectCustomer(customers[0]);
       }
     } catch (error) {
       toast({ title: "Search Error", description: "Failed to search for customer.", variant: "destructive" });
@@ -276,6 +281,27 @@ export default function BillingPageContent() {
       });
       return;
     }
+    
+    if (!selectedCustomer && !searchedMobileForNotFound) {
+        toast({
+            title: "Customer Not Selected",
+            description: "Please search for a customer or add a new one before finalizing the bill.",
+            variant: "destructive",
+        });
+        return;
+    }
+    
+    let customerForOrder: Customer | null = selectedCustomer;
+
+    // If a customer was searched but not found, and user proceeds, means it's a new walk-in for this bill
+    // Or if no customer selected and no mobile searched (should be caught above, but defensive)
+    if (!customerForOrder && searchedMobileForNotFound) {
+      // This case might be simplified if we always force selection or new customer addition
+      // For now, let's assume if selectedCustomer is null, it's a generic walk-in unless a dialog was used to add one.
+      // The current logic forces selectedCustomer to be non-null or opens a dialog.
+      // So, this branch might be less relevant if user flow enforces customer selection/addition.
+    }
+
 
     const subtotal = billItems.reduce((sum, item) => sum + item.price * item.billQuantity, 0);
     const taxRate = 0.18;
@@ -293,13 +319,14 @@ export default function BillingPageContent() {
       barcode: item.barcode || null,
     }));
 
-    // These values will be non-null strings due to the logic in addOrderAndDecrementStock
-    const customerName = selectedCustomer?.name || "Walk-in Customer";
-    const customerMobile = selectedCustomer?.mobileNumber || "N/A";
-    const customerAddress = selectedCustomer?.address || null;
+    const customerId = customerForOrder?.id || WALK_IN_CUSTOMER_ID;
+    const customerName = customerForOrder?.name || "Walk-in Customer";
+    const customerMobile = customerForOrder?.mobileNumber || searchedMobileForNotFound || "N/A";
+    const customerAddress = customerForOrder?.address || null;
+
 
     const orderData: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'> = {
-      customerId: selectedCustomer?.id || WALK_IN_CUSTOMER_ID,
+      customerId: customerId,
       customerName: customerName,
       customerMobile: customerMobile,
       customerAddress: customerAddress, 
@@ -327,6 +354,7 @@ export default function BillingPageContent() {
         title: "Bill Sent for Printing!",
         description: `Order ${newOrder.orderNumber} saved. PDF is opening for print.`,
         className: "bg-green-500 text-white",
+        duration: 5000,
       });
       setBillItems([]);
       handleClearCustomer();
@@ -347,33 +375,33 @@ export default function BillingPageContent() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-primary">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">
           {fromOrderId ? "Re-create Bill" : "Create New Bill"}
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-sm sm:text-base text-muted-foreground">
           Add products by barcode/SN and generate a bill for your customer.
         </p>
       </div>
 
       <Card className="shadow-md">
         <CardHeader>
-          <CardTitle className="text-xl text-primary">Customer Details (Optional)</CardTitle>
+          <CardTitle className="text-lg sm:text-xl text-primary">Customer Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {selectedCustomer ? (
-            <div className="flex items-center justify-between p-3 border rounded-md bg-secondary">
-              <div>
-                <p className="font-semibold">{selectedCustomer.name}</p>
-                <p className="text-sm text-muted-foreground">{selectedCustomer.mobileNumber}</p>
-                 {selectedCustomer.address && <p className="text-xs text-muted-foreground mt-1">{selectedCustomer.address}</p>}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 border rounded-md bg-secondary/50">
+              <div className="mb-2 sm:mb-0">
+                <p className="font-semibold text-base sm:text-lg">{selectedCustomer.name}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">{selectedCustomer.mobileNumber}</p>
+                 {selectedCustomer.address && <p className="text-xs text-muted-foreground mt-1 max-w-xs truncate" title={selectedCustomer.address}>{selectedCustomer.address}</p>}
               </div>
               <Button variant="outline" size="sm" onClick={handleClearCustomer}>Change</Button>
             </div>
           ) : (
             <>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Input
                   type="text"
                   placeholder="Search customer by mobile..."
@@ -383,37 +411,47 @@ export default function BillingPageContent() {
                     if (searchedMobileForNotFound) setSearchedMobileForNotFound(null);
                     if (foundCustomers.length > 0) setFoundCustomers([]);
                   }}
-                  className="flex-grow"
+                  className="flex-grow text-sm sm:text-base"
                   onKeyDown={(e) => e.key === 'Enter' && handleSearchCustomer()}
+                  aria-label="Search customer mobile number"
                 />
-                <Button onClick={() => handleSearchCustomer()} disabled={isSearchingCustomer} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                  <UserSearch className="mr-2 h-5 w-5" /> {isSearchingCustomer ? "Searching..." : "Search"}
+                <Button onClick={() => handleSearchCustomer()} disabled={isSearchingCustomer} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
+                  <UserSearch className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> {isSearchingCustomer ? "Searching..." : "Search"}
                 </Button>
               </div>
               {foundCustomers.length > 0 && (
-                <ul className="border rounded-md max-h-40 overflow-y-auto">
+                <ul className="border rounded-md max-h-32 sm:max-h-40 overflow-y-auto text-sm sm:text-base">
                   {foundCustomers.map(cust => (
                     <li key={cust.id} className="p-2 hover:bg-muted cursor-pointer border-b last:border-b-0" onClick={() => handleSelectCustomer(cust)}>
                       {cust.name} - {cust.mobileNumber}
-                      {cust.address && <span className="text-xs block text-muted-foreground">{cust.address}</span>}
+                      {cust.address && <span className="text-xs block text-muted-foreground max-w-xs truncate" title={cust.address}>{cust.address}</span>}
                     </li>
                   ))}
                 </ul>
               )}
               {searchedMobileForNotFound && foundCustomers.length === 0 && !isSearchingCustomer && (
-                <div className="mt-2 text-center">
-                  <p className="text-sm text-muted-foreground mb-2">Customer with mobile <span className="font-semibold">{searchedMobileForNotFound}</span> not found.</p>
-                  <Button variant="outline" onClick={handleOpenCustomerDialog}>
+                <div className="mt-2 text-center p-2 border border-dashed rounded-md">
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-2">Customer with mobile <span className="font-semibold">{searchedMobileForNotFound}</span> not found.</p>
+                  <Button variant="outline" size="sm" onClick={handleOpenCustomerDialog}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Add New Customer
                   </Button>
                 </div>
               )}
+               {!selectedCustomer && !customerSearchTerm && !searchedMobileForNotFound && (
+                 <Alert variant="default" className="border-primary/50 text-primary bg-primary/5">
+                    <Info className="h-5 w-5 !text-primary" />
+                    <AlertTitle className="font-semibold">Tip</AlertTitle>
+                    <AlertDescription>
+                    Search for an existing customer by mobile number, or proceed to add a new customer if not found. For a quick walk-in sale, you can skip this step and finalize the bill directly.
+                    </AlertDescription>
+                </Alert>
+               )}
             </>
           )}
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 items-start">
         <div className="lg:col-span-2 space-y-6">
           <BarcodeEntry onProductAdd={handleProductAdd} />
           {billItems.length > 0 ? (
@@ -433,7 +471,7 @@ export default function BillingPageContent() {
               </Alert>
           )}
         </div>
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 lg:sticky lg:top-20">
           {isLoadingProducts && billItems.length === 0 ? <Skeleton className="h-48 w-full" /> :
             <BillSummaryCard items={billItems} onFinalizeBill={handleFinalizeBill} />
           }
@@ -448,4 +486,3 @@ export default function BillingPageContent() {
     </div>
   );
 }
-
