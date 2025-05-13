@@ -1,23 +1,26 @@
 // src/app/products/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import ProductTable from "@/components/products/ProductTable";
 import ProductDialog from "@/components/products/ProductDialog";
 import type { ProductFormData } from "@/components/products/ProductForm";
 import type { Product, Category, UserRole } from "@/types";
-import { PlusCircle, UploadCloud } from "lucide-react"; // Added UploadCloud
+import { PlusCircle, UploadCloud, Filter, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getProducts, addProduct, updateProduct, deleteProduct, getCategories } from "@/services/firebaseService";
-import { Skeleton } from "@/components/ui/skeleton"; 
+import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Link from "next/link";
 import AuthGuard from "@/components/auth/AuthGuard";
-import { useAuth } from "@/hooks/useAuth"; // Import useAuth
+import { useAuth } from "@/hooks/useAuth";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const pageAccessRoles: UserRole[] = ['owner', 'admin', 'employee'];
-const bulkUploadRoles: UserRole[] = ['owner', 'admin', 'employee']; // Updated roles
+const bulkUploadRoles: UserRole[] = ['owner', 'admin', 'employee'];
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -26,7 +29,14 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-  const { userProfile } = useAuth(); // Get userProfile for role check
+  const { userProfile } = useAuth();
+
+  // Filter states
+  const [filterName, setFilterName] = useState("");
+  const [filterCategory, setFilterCategory] = useState(""); // Stores category ID
+  const [filterSerialNumber, setFilterSerialNumber] = useState("");
+  const [filterBarcode, setFilterBarcode] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -42,7 +52,7 @@ export default function ProductsPage() {
           categoryName: fetchedCategories.find(c => c.id === p.categoryId)?.name || 'Unknown'
         }));
         setProducts(productsWithCategoryNames);
-        setCategories(fetchedCategories);
+        setCategories(fetchedCategories.sort((a,b) => a.name.localeCompare(b.name)));
       } catch (error) {
         console.error("Error fetching data:", error);
         toast({ title: "Error", description: "Failed to fetch products or categories.", variant: "destructive" });
@@ -115,11 +125,13 @@ export default function ProductsPage() {
     try {
       if (editingProduct) {
         await updateProduct(editingProduct.id, productData);
-        setProducts(
-          products.map((p) =>
-            p.id === editingProduct.id ? { ...editingProduct, ...productData, categoryName: categoryName } : p
-          )
-        );
+        // Refetch all products to ensure data consistency and sorting after update
+        const fetchedProducts = await getProducts();
+        const productsWithCategoryNames = fetchedProducts.map(p => ({
+          ...p,
+          categoryName: categories.find(c => c.id === p.categoryId)?.name || 'Unknown'
+        }));
+        setProducts(productsWithCategoryNames);
         toast({
           title: "Product Updated",
           description: `"${data.name}" has been successfully updated.`,
@@ -145,6 +157,24 @@ export default function ProductsPage() {
       toast({ title: "Error", description: "Failed to save product.", variant: "destructive" });
     }
   };
+  
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      const nameMatch = filterName ? product.name.toLowerCase().includes(filterName.toLowerCase()) : true;
+      const categoryMatch = filterCategory ? product.categoryId === filterCategory : true;
+      const serialMatch = filterSerialNumber ? product.serialNumber?.toLowerCase().includes(filterSerialNumber.toLowerCase()) : true;
+      const barcodeMatch = filterBarcode ? product.barcode?.toLowerCase().includes(filterBarcode.toLowerCase()) : true;
+      return nameMatch && categoryMatch && serialMatch && barcodeMatch;
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }, [products, filterName, filterCategory, filterSerialNumber, filterBarcode]);
+
+  const resetFilters = () => {
+    setFilterName("");
+    setFilterCategory("");
+    setFilterSerialNumber("");
+    setFilterBarcode("");
+    setShowFilters(false);
+  };
 
   return (
     <AuthGuard allowedRoles={pageAccessRoles}>
@@ -157,6 +187,9 @@ export default function ProductsPage() {
             </p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className="w-full sm:w-auto">
+              <Filter className="mr-2 h-5 w-5" /> {showFilters ? "Hide" : "Show"} Filters
+            </Button>
             {userProfile && bulkUploadRoles.includes(userProfile.role) && (
               <Button asChild variant="outline" className="w-full sm:w-auto border-accent text-accent hover:bg-accent/10 hover:text-accent">
                 <Link href="/settings/bulk-upload">
@@ -170,6 +203,52 @@ export default function ProductsPage() {
           </div>
         </div>
 
+        {showFilters && (
+          <Card className="shadow-md">
+            <CardHeader>
+              <CardTitle className="text-lg flex justify-between items-center">
+                Filter Products
+                <Button variant="ghost" size="sm" onClick={resetFilters} className="text-xs">
+                  <XCircle className="mr-1 h-4 w-4" /> Reset Filters
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <Input
+                placeholder="Filter by Name..."
+                value={filterName}
+                onChange={(e) => setFilterName(e.target.value)}
+                className="text-sm"
+              />
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder="Filter by Category..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Categories</SelectItem>
+                  {categories.map(category => (
+                    <SelectItem key={category.id} value={category.id} className="text-sm">
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                placeholder="Filter by Serial Number..."
+                value={filterSerialNumber}
+                onChange={(e) => setFilterSerialNumber(e.target.value)}
+                className="text-sm"
+              />
+              <Input
+                placeholder="Filter by Barcode..."
+                value={filterBarcode}
+                onChange={(e) => setFilterBarcode(e.target.value)}
+                className="text-sm"
+              />
+            </CardContent>
+          </Card>
+        )}
+
         {isLoading ? (
           <div className="space-y-4">
             <Skeleton className="h-12 w-full" />
@@ -181,7 +260,6 @@ export default function ProductsPage() {
           <>
             {categories.length === 0 && (
               <Alert variant="default" className="border-accent text-accent bg-accent/10">
-                {/* Using a generic icon or removing Info if not critical */}
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 !text-accent"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
                 <AlertTitle className="font-semibold">No Categories Available</AlertTitle>
                 <AlertDescription>
@@ -192,7 +270,7 @@ export default function ProductsPage() {
               </Alert>
             )}
             <ProductTable
-              products={products}
+              products={filteredProducts}
               onEdit={handleEditProduct}
               onDelete={handleDeleteProduct}
             />

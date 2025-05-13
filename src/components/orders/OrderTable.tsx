@@ -11,18 +11,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Eye, Copy } from 'lucide-react';
+import { Eye, Copy, Edit } from 'lucide-react'; // Added Edit
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { Timestamp } from 'firebase/firestore'; 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { useAuth } from '@/hooks/useAuth'; // Import useAuth to check roles
 
 interface OrderTableProps {
   orders: Order[];
+  // Add props to indicate if filters are active for a more specific empty state message
+  filtersActive?: boolean; 
 }
 
-const OrderTable: React.FC<OrderTableProps> = ({ orders }) => {
+const OrderTable: React.FC<OrderTableProps> = ({ orders, filtersActive }) => {
+  const { userProfile } = useAuth(); // Get current user's profile
+
   const formatDate = (dateValue: Timestamp | string | Date | undefined | null) => {
     if (!dateValue) return 'N/A';
     let dateToFormat: Date;
@@ -39,6 +44,7 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders }) => {
     } else if (typeof dateValue === 'string') {
       try {
         dateToFormat = new Date(dateValue);
+        if (isNaN(dateToFormat.getTime())) throw new Error("Invalid date string parsed");
       } catch (e) {
         console.error("Error parsing date string in OrderTable:", e, dateValue);
         return 'Invalid Date';
@@ -46,6 +52,7 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders }) => {
     } else if (typeof (dateValue as any)?.toDate === 'function') {
        try {
          dateToFormat = (dateValue as any).toDate();
+         if (isNaN(dateToFormat.getTime())) throw new Error("Invalid date from toDate()");
        } catch (e) {
           console.error("Error formatting object with toDate() in OrderTable:", e, dateValue);
           return 'Invalid Date';
@@ -56,15 +63,22 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders }) => {
     }
     
     try {
-      if (isNaN(dateToFormat.getTime())) {
-           console.warn("Invalid Date object after conversion in OrderTable:", dateToFormat, "Original:", dateValue);
-           return 'Invalid Date';
-      }
       return format(dateToFormat, 'PPpp');
     } catch (e) {
       console.error("Error formatting final Date object in OrderTable:", e, dateToFormat);
       return 'Invalid Date';
     }
+  };
+
+
+  const canEditOrder = (order: Order): boolean => {
+    // Only owners can edit orders
+    return userProfile?.role === 'owner';
+  };
+
+  const canRecreateBill = (order: Order): boolean => {
+    // Owners and Admins can recreate bills
+    return userProfile?.role === 'owner' || userProfile?.role === 'admin';
   };
 
 
@@ -83,13 +97,13 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders }) => {
                         <TableHead className="px-2 sm:px-4">Date</TableHead>
                         <TableHead className="text-right px-2 sm:px-4">Total Amount</TableHead>
                         <TableHead className="text-center px-2 sm:px-4">Items</TableHead>
-                        <TableHead className="text-center w-[100px] sm:w-[120px] px-2 sm:px-4">Actions</TableHead>
+                        <TableHead className="text-center w-[100px] sm:w-[140px] px-2 sm:px-4">Actions</TableHead>
                     </TableRow>
                     </TableHeader><TableBody>
                     {orders.length === 0 ? (
                         <TableRow>
                         <TableCell colSpan={6} className="h-24 text-center text-sm sm:text-base">
-                            No orders found.
+                            {filtersActive ? "No orders match your filters." : "No orders found."}
                         </TableCell>
                         </TableRow>
                     ) : (
@@ -107,11 +121,20 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders }) => {
                                     <Eye className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
                                   </Link>
                                 </Button>
+                                {canRecreateBill(order) && (
                                 <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8" asChild title="Re-create Bill from this Order">
                                   <Link href={`/billing?fromOrder=${order.id}`}>
                                     <Copy className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
                                   </Link>
                                 </Button>
+                                )}
+                                {canEditOrder(order) && (
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8" asChild title="Edit Order">
+                                    <Link href={`/billing?fromOrder=${order.id}&intent=edit`}>
+                                      <Edit className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500" />
+                                    </Link>
+                                  </Button>
+                                )}
                             </div>
                             </TableCell>
                         </TableRow>

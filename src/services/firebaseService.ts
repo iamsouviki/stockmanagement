@@ -24,12 +24,12 @@ import { WALK_IN_CUSTOMER_ID } from '@/types';
 import { format } from 'date-fns';
 
 // Generic CRUD operations
-const getCollection = async <T extends Record<string, any>>(
+const getCollection = async <T extends {id: string}>(
   collectionName: string,
   orderByField?: Extract<keyof T, string> | FieldPath, 
   orderDirection: OrderByDirection = 'asc',
   pageLimit: number = 0,
-  lastVisible?: any
+  lastVisibleDoc?: any // Firestore DocumentSnapshot for pagination
 ): Promise<T[]> => {
   let q = query(collection(db, collectionName)); 
   if (orderByField) {
@@ -38,12 +38,13 @@ const getCollection = async <T extends Record<string, any>>(
   if (pageLimit > 0) {
     q = query(q, limit(pageLimit));
   }
-  if (lastVisible) {
-    q = query(q, startAfter(lastVisible));
+  if (lastVisibleDoc) {
+    q = query(q, startAfter(lastVisibleDoc));
   }
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
 };
+
 
 const getDocument = async <T extends Record<string, any>>(collectionName: string, id: string): Promise<T | null> => {
   const docRef = doc(db, collectionName, id);
@@ -76,7 +77,6 @@ const deleteDocument = async (collectionName: string, id: string): Promise<void>
 export const getCategories = () => getCollection<Category>('categories', 'name');
 export const addCategory = async (data: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>): Promise<Category> => {
   const id = await addDocument<Category>('categories', data);
-  // For immediate use, we create a client-side timestamp. Firestore will override with serverTimestamp.
   const now = Timestamp.now();
   return { id, ...data, createdAt: now, updatedAt: now }; 
 };
@@ -85,11 +85,12 @@ export const deleteCategory = (id: string) => deleteDocument('categories', id);
 
 export const findCategoryByNameOrCreate = async (name: string): Promise<Category> => {
   const trimmedName = name.trim();
-  const allCategories = await getCategories(); 
-  const existingCategory = allCategories.find(cat => cat.name.toLowerCase() === trimmedName.toLowerCase());
+  const q = query(collection(db, 'categories'), where('name', '==', trimmedName), limit(1));
+  const snapshot = await getDocs(q);
 
-  if (existingCategory) {
-    return existingCategory;
+  if (!snapshot.empty) {
+    const docData = snapshot.docs[0];
+    return { id: docData.id, ...docData.data() } as Category;
   } else {
     const newCategoryData = { name: trimmedName };
     return addCategory(newCategoryData); 
@@ -157,23 +158,30 @@ export const addOrderAndDecrementStock = async (
   const completeOrderData = { 
     ...orderData, 
     orderNumber,
-    orderDate: Timestamp.fromDate(now),
+    orderDate: Timestamp.fromDate(now), // Server timestamp for orderDate
     createdAt: serverTimestamp(), 
     updatedAt: serverTimestamp(), 
   };
 
-  const newOrderRef = doc(collection(db, 'orders'));
+  const newOrderRef = doc(collection(db, 'orders')); // Generate new doc ref for the order
   batch.set(newOrderRef, completeOrderData);
 
   for (const item of itemsToDecrement) {
     const productRef = doc(db, 'products', item.productId);
-    const productSnap = await getDoc(productRef); 
+    // It's better to use a transaction or a server-side function for decrementing stock
+    // to avoid race conditions, but for client-side batch:
+    const productSnap = await getDoc(productRef); // Fetch current stock *before* batch commit
     if (productSnap.exists()) {
       const currentStock = productSnap.data().quantity || 0;
       const newStock = Math.max(0, currentStock - item.quantity);
+      if (currentStock < item.quantity) {
+        console.warn(`Stock for product ${item.productId} (${productSnap.data().name}) is ${currentStock}, but trying to decrement by ${item.quantity}. Setting to 0.`);
+      }
       batch.update(productRef, { quantity: newStock, updatedAt: serverTimestamp() });
     } else {
       console.warn(`Product with ID ${item.productId} not found for stock decrement.`);
+      // Potentially throw error here if strict stock control is needed
+      // throw new Error(`Product with ID ${item.productId} not found, cannot create order.`);
     }
   }
 
@@ -185,80 +193,95 @@ export const addOrderAndDecrementStock = async (
 export const updateOrderAndAdjustStock = async (
   orderId: string,
   updatedOrderPayload: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'>,
-  originalOrder: Order // Pass the original order to calculate stock differences
+  originalOrder: Order // Crucial for calculating stock differences
 ): Promise<string> => {
+  console.log("updateOrderAndAdjustStock called for orderId:", orderId);
+  console.log("Original Order:", JSON.stringify(originalOrder, null, 2));
+  console.log("Updated Payload:", JSON.stringify(updatedOrderPayload, null, 2));
+
   const batch = writeBatch(db);
   const orderRef = doc(db, 'orders', orderId);
 
-  // if (!originalOrder) { // originalOrder is now passed as a parameter
-  //   throw new Error(`Original order with ID ${orderId} not found for update.`);
-  // }
+  // 1. Calculate net stock changes for each product
+  const stockAdjustments = new Map<string, number>(); // productId -> quantity adjustment (positive adds to stock, negative subtracts)
 
-  const stockAdjustments = new Map<string, number>(); // productId -> netStockChange (positive to add to stock, negative to remove)
-
-  // 1. Calculate stock to be "returned" from original items
-  originalOrder.items.forEach(originalItem => {
-    stockAdjustments.set(
-      originalItem.productId,
-      (stockAdjustments.get(originalItem.productId) || 0) + originalItem.billQuantity
-    );
+  // Add back quantities from original order items
+  originalOrder.items.forEach(item => {
+    stockAdjustments.set(item.productId, (stockAdjustments.get(item.productId) || 0) + item.billQuantity);
   });
+  console.log("Stock adjustments after returning original items:", JSON.stringify(Object.fromEntries(stockAdjustments)));
 
-  // 2. Calculate stock to be "taken" for updated items
-  updatedOrderPayload.items.forEach(updatedItem => {
-    stockAdjustments.set(
-      updatedItem.productId,
-      (stockAdjustments.get(updatedItem.productId) || 0) - updatedItem.billQuantity
-    );
+
+  // Subtract quantities for updated order items
+  updatedOrderPayload.items.forEach(item => {
+    stockAdjustments.set(item.productId, (stockAdjustments.get(item.productId) || 0) - item.billQuantity);
   });
-  
-  // 3. Prepare product stock updates
-  const productUpdatePromises: Promise<void>[] = [];
+  console.log("Net stock adjustments (negative means stock decrease, positive means stock increase):", JSON.stringify(Object.fromEntries(stockAdjustments)));
 
-  for (const [productId, netChange] of stockAdjustments.entries()) {
-    if (netChange === 0) continue; // No change for this product
+
+  // 2. Prepare product stock updates within the batch
+  const productUpdatePromises = Array.from(stockAdjustments.entries()).map(async ([productId, netQuantityChange]) => {
+    if (netQuantityChange === 0) return; // No change for this product
 
     const productRef = doc(db, 'products', productId);
-    productUpdatePromises.push(
-      getDoc(productRef).then(productSnap => {
-        if (productSnap.exists()) {
-          const currentStock = productSnap.data().quantity || 0;
-          const newStock = currentStock + netChange; 
+    try {
+      const productSnap = await getDoc(productRef); // Get current DB stock
+      if (productSnap.exists()) {
+        const currentDBStock = productSnap.data().quantity || 0;
+        const newDBStock = currentDBStock - netQuantityChange; // If netQuantityChange is negative (stock taken), this subtracts. If positive (stock returned), this adds.
+        
+        console.log(`Product ID: ${productId}, Name: ${productSnap.data().name}, Current DB Stock: ${currentDBStock}, Net Change from Order: ${netQuantityChange}, New DB Stock: ${newDBStock}`);
 
-          if (newStock < 0) {
-            // This check is critical
-            throw new Error(`Insufficient stock for product ${productSnap.data().name || productId} after update. Required: ${-netChange}, Available (after returning original): ${currentStock + (originalOrder.items.find(i => i.productId === productId)?.billQuantity || 0) }.`);
-          }
-          batch.update(productRef, { quantity: newStock, updatedAt: serverTimestamp() });
-        } else {
-          // Handle if product was deleted between order creation and edit
-          if (netChange < 0) { // Trying to take stock for a product that doesn't exist
-             throw new Error(`Product with ID ${productId} not found, cannot decrement stock for non-existent product during order update.`);
-          }
-          // If netChange > 0, means returning stock to a non-existent product, which is a data integrity issue but less critical than going negative.
-          console.warn(`Product with ID ${productId} not found during stock adjustment for order update (netChange: ${netChange}). Stock not adjusted as product doc is missing.`);
+        if (newDBStock < 0) {
+          throw new Error(
+            `Insufficient stock for product '${productSnap.data().name || productId}'. ` +
+            `Required change: ${-netQuantityChange}, but would result in stock of ${newDBStock}. ` +
+            `Current DB stock is ${currentDBStock}.`
+          );
         }
-      }).catch(error => {
-        console.error(`Error processing stock for product ${productId}:`, error);
-        throw error; 
-      })
-    );
+        batch.update(productRef, { quantity: newDBStock, updatedAt: serverTimestamp() });
+      } else {
+        // If product was deleted, and we are trying to decrement stock (netQuantityChange > 0 effectively)
+        if (netQuantityChange > 0) { // This means updated order has FEWER items than original, or item removed
+            // This is effectively trying to return stock to a non-existent product. Log, but don't fail.
+             console.warn(`Product ID ${productId} not found, but order update implies returning ${netQuantityChange} units. Stock cannot be returned to non-existent product.`);
+        } else { // netQuantityChange < 0, trying to take stock for a non-existent product
+             throw new Error(`Product ID ${productId} not found. Cannot take stock for non-existent product during order update.`);
+        }
+      }
+    } catch (error) {
+      console.error(`Error preparing stock update for product ${productId}:`, error);
+      throw error; // Re-throw to fail the batch
+    }
+  });
+
+  // Wait for all product document reads and batch update preparations
+  try {
+    await Promise.all(productUpdatePromises);
+  } catch (error) {
+    console.error("Failed during product stock validation for update:", error);
+    throw error; // Propagate error to prevent batch commit
   }
 
-  // Wait for all product stock fetches and validations to complete
-  await Promise.all(productUpdatePromises);
 
-  // 4. Update the order document itself
-  const finalOrderUpdatePayload = {
-    ...updatedOrderPayload, // This includes new items, customer details, totals from client
+  // 3. Update the order document itself
+  // Preserve original orderNumber and orderDate. createdAt is never changed.
+  const finalOrderUpdateData = {
+    ...updatedOrderPayload, // This includes new items, customer details, totals
+    // orderNumber: originalOrder.orderNumber, // Retain original order number
+    // orderDate: originalOrder.orderDate,     // Retain original order date
     updatedAt: serverTimestamp(),
-    orderNumber: originalOrder.orderNumber, // Preserve original order number
-    orderDate: originalOrder.orderDate,     // Preserve original order date
-    // createdAt is inherently preserved on update
   };
-  batch.update(orderRef, finalOrderUpdatePayload);
+  // Ensure read-only fields are not accidentally included if they came from payload
+  delete (finalOrderUpdateData as any).id;
+  delete (finalOrderUpdateData as any).orderNumber; // Should be immutable after creation
+  delete (finalOrderUpdateData as any).orderDate;   // Should be immutable after creation
+  delete (finalOrderUpdateData as any).createdAt; // Should be immutable
+
+  batch.update(orderRef, finalOrderUpdateData);
+  console.log("Order document update prepared for batch:", JSON.stringify(finalOrderUpdateData, null, 2));
 
   await batch.commit();
+  console.log("Order update batch committed successfully.");
   return orderId;
 };
-

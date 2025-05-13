@@ -1,3 +1,4 @@
+// src/app/categories/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -6,22 +7,21 @@ import CategoryTable from "@/components/categories/CategoryTable";
 import CategoryDialog from "@/components/categories/CategoryDialog";
 import type { CategoryFormData } from "@/components/categories/CategoryForm";
 import type { Category, UserRole } from "@/types";
-import { PlusCircle, Tags } from "lucide-react";
+import { PlusCircle, Tags, Search as SearchIcon } from "lucide-react"; // Renamed Search
 import { useToast } from "@/hooks/use-toast";
 import { getCategories, addCategory, updateCategory, deleteCategory } from "@/services/firebaseService";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
 import AuthGuard from "@/components/auth/AuthGuard";
 
-const allowedRoles: UserRole[] = ['owner', 'admin', 'employee']; // Added 'admin'
+const allowedRoles: UserRole[] = ['owner', 'admin', 'employee'];
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [filterName, setFilterName] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -29,7 +29,7 @@ export default function CategoriesPage() {
       setIsLoading(true);
       try {
         const fetchedCategories = await getCategories();
-        setCategories(fetchedCategories);
+        setCategories(fetchedCategories); // Already sorted by name in getCategories
       } catch (error) {
         console.error("Error fetching categories:", error);
         toast({ title: "Error", description: "Failed to fetch categories.", variant: "destructive" });
@@ -80,22 +80,18 @@ export default function CategoriesPage() {
 
       if (editingCategory) {
         await updateCategory(editingCategory.id, data);
-        setCategories(
-          categories.map((c) =>
-            c.id === editingCategory.id ? { ...c, ...data } : c
-          ).sort((a,b) => a.name.localeCompare(b.name))
-        );
+        // Refetch categories to ensure list is up-to-date and sorted
+        const fetchedCategories = await getCategories();
+        setCategories(fetchedCategories);
         toast({
           title: "Category Updated",
           description: `Category "${data.name}" has been successfully updated.`,
         });
       } else {
         const newCategoryId = await addCategory(data);
-        const newCategory: Category = {
-          id: newCategoryId,
-          name: data.name,
-        };
-        setCategories([...categories, newCategory].sort((a,b) => a.name.localeCompare(b.name)));
+        // Refetch categories to include the new one and maintain sort order
+        const fetchedCategories = await getCategories();
+        setCategories(fetchedCategories);
         toast({
           title: "Category Added",
           description: `Category "${data.name}" has been successfully added.`,
@@ -110,11 +106,12 @@ export default function CategoriesPage() {
   };
   
   const filteredCategories = useMemo(() => {
-    if (!searchTerm) return categories;
+    if (!filterName) return categories;
+    const searchTermLower = filterName.toLowerCase();
     return categories.filter(category =>
-      category.name.toLowerCase().includes(searchTerm.toLowerCase())
+      category.name.toLowerCase().includes(searchTermLower)
     );
-  }, [categories, searchTerm]);
+  }, [categories, filterName]);
 
   return (
     <AuthGuard allowedRoles={allowedRoles}>
@@ -134,14 +131,14 @@ export default function CategoriesPage() {
         </div>
 
         <div className="relative mt-2 sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search categories..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 w-full"
-            aria-label="Search categories by name"
+            placeholder="Filter categories by name..."
+            value={filterName}
+            onChange={(e) => setFilterName(e.target.value)}
+            className="pl-10 w-full text-sm"
+            aria-label="Filter categories by name"
           />
         </div>
 
@@ -156,7 +153,7 @@ export default function CategoriesPage() {
             categories={filteredCategories}
             onEdit={handleEditCategory}
             onDelete={handleDeleteCategory}
-            searchTerm={searchTerm}
+            searchTerm={filterName} // Pass filterName as searchTerm to table for its empty state message
           />
         )}
 

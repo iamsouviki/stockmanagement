@@ -1,3 +1,4 @@
+// src/app/customers/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -6,19 +7,19 @@ import CustomerTable from "@/components/customers/CustomerTable";
 import CustomerDialog from "@/components/customers/CustomerDialog";
 import type { CustomerFormData } from "@/components/customers/CustomerForm";
 import type { Customer, UserRole } from "@/types";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Users as UsersIcon } from "lucide-react"; // Renamed to avoid conflict
 import { useToast } from "@/hooks/use-toast";
 import { getCustomers, addCustomer, updateCustomer, deleteCustomer, findCustomerByMobile } from "@/services/firebaseService";
 import { Skeleton } from "@/components/ui/skeleton";
 import AuthGuard from "@/components/auth/AuthGuard";
 
-const allowedRoles: UserRole[] = ['owner', 'admin', 'employee']; // Added 'admin'
+const allowedRoles: UserRole[] = ['owner', 'admin', 'employee'];
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [filterNameOrMobile, setFilterNameOrMobile] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
@@ -27,7 +28,7 @@ export default function CustomersPage() {
       setIsLoading(true);
       try {
         const fetchedCustomers = await getCustomers();
-        setCustomers(fetchedCustomers);
+        setCustomers(fetchedCustomers.sort((a,b) => a.name.localeCompare(b.name)));
       } catch (error) {
         console.error("Error fetching customers:", error);
         toast({ title: "Error", description: "Failed to fetch customers.", variant: "destructive" });
@@ -80,11 +81,9 @@ export default function CustomersPage() {
 
       if (editingCustomer) {
         await updateCustomer(editingCustomer.id, data);
-        setCustomers(
-          customers.map((c) =>
-            c.id === editingCustomer.id ? { ...editingCustomer, ...data } : c
-          )
-        );
+        // Refetch customers to ensure list is up-to-date and sorted correctly
+        const fetchedCustomers = await getCustomers();
+        setCustomers(fetchedCustomers.sort((a,b) => a.name.localeCompare(b.name)));
         toast({
           title: "Customer Updated",
           description: `Information for "${data.name}" has been successfully updated.`,
@@ -96,11 +95,9 @@ export default function CustomersPage() {
           imageHint: "person avatar",
         };
         const newCustomerId = await addCustomer(customerData);
-        const newCustomerEntry: Customer = {
-          ...customerData,
-          id: newCustomerId,
-        };
-        setCustomers([newCustomerEntry, ...customers]);
+        // Refetch to include the new customer and maintain sort order
+        const fetchedCustomers = await getCustomers();
+        setCustomers(fetchedCustomers.sort((a,b) => a.name.localeCompare(b.name)));
         toast({
           title: "Customer Added",
           description: `"${data.name}" has been successfully added.`,
@@ -115,12 +112,13 @@ export default function CustomersPage() {
   };
 
   const filteredCustomers = useMemo(() => {
-    if (!searchTerm) return customers;
+    if (!filterNameOrMobile) return customers;
+    const searchTermLower = filterNameOrMobile.toLowerCase();
     return customers.filter(customer => 
-      customer.mobileNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.name.toLowerCase().includes(searchTerm.toLowerCase())
+      customer.mobileNumber.toLowerCase().includes(searchTermLower) ||
+      customer.name.toLowerCase().includes(searchTermLower)
     );
-  }, [customers, searchTerm]);
+  }, [customers, filterNameOrMobile]);
 
   const existingMobileNumbers = useMemo(() => customers.map(c => c.mobileNumber), [customers]);
 
@@ -130,7 +128,9 @@ export default function CustomersPage() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-primary">Customer Management</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-primary flex items-center">
+              <UsersIcon className="mr-3 h-8 w-8"/> Customer Management
+            </h1>
             <p className="text-muted-foreground">
               Manage your customer database here.
             </p>
@@ -152,8 +152,8 @@ export default function CustomersPage() {
             customers={filteredCustomers}
             onEdit={handleEditCustomer}
             onDelete={handleDeleteCustomer}
-            searchTerm={searchTerm}
-            onSearchTermChange={setSearchTerm}
+            searchTerm={filterNameOrMobile}
+            onSearchTermChange={setFilterNameOrMobile}
           />
         )}
 

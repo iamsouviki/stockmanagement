@@ -43,11 +43,11 @@ export default function BillingPageContent() {
 
   const { toast } = useToast();
 
-  const pageTitle = intent === 'edit' ? "Edit Order" : fromOrderId ? "Re-create Bill" : "Create New Bill";
-  const pageDescription = intent === 'edit'
+  const pageTitle = intent === 'edit' && fromOrderId ? "Edit Order" : fromOrderId ? "Re-create Bill" : "Create New Bill";
+  const pageDescription = intent === 'edit' && fromOrderId
     ? "Modify the items and customer details for this order and generate an updated bill."
     : "Add products by barcode/SN and generate a bill for your customer.";
-  const finalizeButtonText = intent === 'edit' ? "Update Order & Print" : "Finalize & Generate Bill";
+  const finalizeButtonText = intent === 'edit' && fromOrderId ? "Update Order & Print" : "Finalize & Generate Bill";
 
 
   const fetchProductData = useCallback(async () => {
@@ -73,9 +73,8 @@ export default function BillingPageContent() {
         try {
           const order = await getOrderById(fromOrderId);
           if (order) {
-            // Only set originalOrderForEdit if the intent is 'edit'
             if (intent === 'edit') {
-              setOriginalOrderForEdit(order);
+              setOriginalOrderForEdit(order); // Set original order for edit mode
             }
             const itemsForBill: BillItem[] = order.items.map(item => {
               const productDetails = availableProducts.find(p => p.id === item.productId);
@@ -84,8 +83,8 @@ export default function BillingPageContent() {
                 id: item.productId,
                 name: productDetails?.name || item.name,
                 price: productDetails?.price || item.price,
-                quantity: productDetails?.quantity ?? 0, 
-                billQuantity: item.billQuantity,
+                quantity: productDetails?.quantity ?? 0, // DB stock
+                billQuantity: item.billQuantity, // Qty in this bill
                 categoryId: productDetails?.categoryId ?? '',
                 serialNumber: item.serialNumber || productDetails?.serialNumber || '',
                 barcode: item.barcode || productDetails?.barcode || '',
@@ -118,8 +117,10 @@ export default function BillingPageContent() {
     } else if (!fromOrderId) {
       // Clear originalOrderForEdit if navigating to /billing without fromOrder (i.e., for a new bill)
       setOriginalOrderForEdit(null); 
+      setBillItems([]); // Clear items for a new bill
+      setSelectedCustomer(null);
+      setCustomerSearchTerm("");
     }
-  // Ensure intent is part of dependency array to correctly manage originalOrderForEdit
   }, [fromOrderId, availableProducts, router, intent, toast]); 
 
 
@@ -140,9 +141,9 @@ export default function BillingPageContent() {
     const existingItem = billItems.find((item) => item.id === productToAdd.id);
     const currentBillQuantity = existingItem ? existingItem.billQuantity : 0;
     
-    let stockAvailableForThisItem = productToAdd.quantity;
+    let stockAvailableForThisItem = productToAdd.quantity; // This is current DB stock
 
-    // If editing, the "available stock" includes what was originally in the order being edited
+    // If editing, the "available stock" for UI validation includes what was originally in the order
     if (intent === 'edit' && originalOrderForEdit) {
       const originalItemInOrder = originalOrderForEdit.items.find(item => item.productId === productToAdd.id);
       if (originalItemInOrder) {
@@ -150,8 +151,7 @@ export default function BillingPageContent() {
       }
     }
 
-
-    if (productToAdd.quantity <= 0 && !existingItem && !(intent === 'edit' && stockAvailableForThisItem > 0)) { 
+    if (productToAdd.quantity <= 0 && !existingItem && !(intent === 'edit' && stockAvailableForThisItem > currentBillQuantity)) { 
          toast({
            title: "Out of Stock",
            description: `Product "${productToAdd.name}" is out of stock.`,
@@ -159,6 +159,7 @@ export default function BillingPageContent() {
          });
          return;
     }
+
     if (existingItem) {
       if (currentBillQuantity < stockAvailableForThisItem) { 
         setBillItems(
@@ -171,13 +172,12 @@ export default function BillingPageContent() {
       } else {
         toast({
           title: "Max Stock Reached",
-          description: `Cannot add more of "${productToAdd.name}". Available (including original order if editing): ${stockAvailableForThisItem}. Current DB stock: ${productToAdd.quantity}.`,
+          description: `Cannot add more of "${productToAdd.name}". Available (considering original order if editing): ${stockAvailableForThisItem}. Current DB stock: ${productToAdd.quantity}.`,
           variant: "destructive",
         });
       }
     } else { 
-      // Add new if stock is available (either from DB or from original order items if editing)
-      if (stockAvailableForThisItem > 0) {
+      if (stockAvailableForThisItem > 0) { // Check if any stock is considered available
         setBillItems([...billItems, { ...productToAdd, billQuantity: 1 }]);
       } else { 
          toast({ 
@@ -202,7 +202,7 @@ export default function BillingPageContent() {
       return;
     }
     
-    let stockAvailableForThisItem = productInStock.quantity;
+    let stockAvailableForThisItem = productInStock.quantity; // Current DB stock
 
     if (intent === 'edit' && originalOrderForEdit) {
       const originalItemInOrder = originalOrderForEdit.items.find(item => item.productId === itemId);
@@ -211,11 +211,10 @@ export default function BillingPageContent() {
       }
     }
 
-
     if (newQuantity > stockAvailableForThisItem) {
       toast({
         title: "Stock Limit Exceeded",
-        description: `Cannot set quantity for "${productInStock.name}" to ${newQuantity}. Max stock available (incl. original order if editing): ${stockAvailableForThisItem}. Current DB stock: ${productInStock.quantity}.`,
+        description: `Cannot set quantity for "${productInStock.name}" to ${newQuantity}. Max stock available (considering original order if editing): ${stockAvailableForThisItem}. Current DB stock: ${productInStock.quantity}.`,
         variant: "destructive",
       });
       setBillItems(
@@ -327,27 +326,21 @@ export default function BillingPageContent() {
 
     let customerForOrder: Customer | null = selectedCustomer;
 
-    // For new bills (not edit) or re-bills (intent != edit), if no customer selected, prompt.
-    // For edit intent, customer can be optional if it was walk-in or if user cleared it.
-    if (intent !== 'edit' && !customerForOrder && !searchedMobileForNotFound) { 
-        toast({
-            title: "Customer Not Selected",
-            description: "Please search for a customer, add a new one, or finalize as walk-in if no mobile is entered.",
+    // For new bills or re-bills (intent != 'edit'), if no customer is explicitly selected or searched for, it's a walk-in.
+    // For edit intent, customer details are preserved from the original order unless explicitly changed.
+    if (!customerForOrder && !(intent === 'edit' && originalOrderForEdit?.customerId)) {
+      if (!searchedMobileForNotFound) { // If no mobile was even searched, it's a true walk-in
+         // Allow walk-in without explicit customer selection for new/re-bills
+      } else { // Mobile searched but not found and no new customer added yet
+         toast({
+            title: "Customer Not Found",
+            description: `Customer with mobile ${searchedMobileForNotFound} not found. Add them or clear search to proceed as walk-in.`,
             variant: "destructive",
-        });
-        return; 
-    } else if (intent === 'edit' && !customerForOrder && originalOrderForEdit) {
-        // If editing, and the currently selected customer is null (e.g., was cleared),
-        // use the customer details from the original order being edited.
-        customerForOrder = {
-            id: originalOrderForEdit.customerId,
-            name: originalOrderForEdit.customerName,
-            mobileNumber: originalOrderForEdit.customerMobile,
-            address: originalOrderForEdit.customerAddress || undefined,
-        };
+         });
+         return;
+      }
     }
-
-
+    
     const subtotal = billItems.reduce((sum, item) => sum + item.price * item.billQuantity, 0);
     const taxRate = 0.18;
     const taxAmount = subtotal * taxRate;
@@ -364,10 +357,24 @@ export default function BillingPageContent() {
       barcode: item.barcode || null,
     }));
 
-    const customerId = customerForOrder?.id || WALK_IN_CUSTOMER_ID;
-    const customerName = customerForOrder?.name || "Walk-in Customer";
-    const customerMobile = customerForOrder?.mobileNumber || searchedMobileForNotFound || "N/A";
-    const customerAddress = customerForOrder?.address || null;
+    // Determine customer details for the order
+    let customerId = WALK_IN_CUSTOMER_ID;
+    let customerName = "Walk-in Customer";
+    let customerMobile = searchedMobileForNotFound || "N/A"; // If searchedMobileForNotFound, use it for walk-in with mobile
+    let customerAddress = null;
+
+    if (selectedCustomer) {
+      customerId = selectedCustomer.id;
+      customerName = selectedCustomer.name;
+      customerMobile = selectedCustomer.mobileNumber;
+      customerAddress = selectedCustomer.address || null;
+    } else if (intent === 'edit' && originalOrderForEdit) {
+      // If editing and customer was cleared, revert to original order's customer for walk-in details if any
+      customerId = originalOrderForEdit.customerId;
+      customerName = originalOrderForEdit.customerName;
+      customerMobile = originalOrderForEdit.customerMobile;
+      customerAddress = originalOrderForEdit.customerAddress || null;
+    }
 
 
     const orderPayload: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'> = {
@@ -383,14 +390,15 @@ export default function BillingPageContent() {
 
     try {
       let orderIdForResult: string;
-      let orderNumberForResult: string | undefined = originalOrderForEdit?.orderNumber;
+      let orderNumberForToast: string | undefined;
 
 
       if (intent === 'edit' && fromOrderId && originalOrderForEdit) {
         orderIdForResult = await updateOrderAndAdjustStock(fromOrderId, orderPayload, originalOrderForEdit);
+        orderNumberForToast = originalOrderForEdit.orderNumber; // Use existing order number for toast
          toast({
           title: "Order Updated!",
-          description: `Order ${orderNumberForResult || orderIdForResult} has been successfully updated. PDF is opening for print.`,
+          description: `Order ${orderNumberForToast || orderIdForResult} has been successfully updated. PDF is opening for print.`,
           className: "bg-green-500 text-white",
           duration: 7000,
         });
@@ -399,17 +407,21 @@ export default function BillingPageContent() {
           productId: item.id,
           quantity: item.billQuantity,
         }));
+        // This call creates a NEW order document and gets a NEW order ID and number
         orderIdForResult = await addOrderAndDecrementStock(orderPayload, itemsToDecrementStock);
-        const tempNewOrder = await getOrderById(orderIdForResult); 
-        orderNumberForResult = tempNewOrder?.orderNumber;
+        // Fetch the newly created order to get its number for the toast
+        const newlyCreatedOrder = await getOrderById(orderIdForResult);
+        orderNumberForToast = newlyCreatedOrder?.orderNumber;
+
         toast({
           title: "Bill Finalized!",
-          description: `Order ${orderNumberForResult || orderIdForResult} saved. PDF is opening for print.`,
+          description: `Order ${orderNumberForToast || orderIdForResult} saved. PDF is opening for print.`,
           className: "bg-green-500 text-white",
           duration: 7000,
         });
       }
       
+      // Fetch the final state of the order (either updated or newly created) for PDF
       const finalOrderForPdf = await getOrderById(orderIdForResult);
       if (!finalOrderForPdf) {
         throw new Error("Failed to retrieve the order details for PDF generation.");
@@ -417,19 +429,22 @@ export default function BillingPageContent() {
 
       generateInvoicePdf(finalOrderForPdf, storeDetails);
       
+      // Reset state for next bill/operation
       setBillItems([]);
       handleClearCustomer();
       setOriginalOrderForEdit(null); 
-      fetchProductData(); 
+      fetchProductData(); // Refresh product stock display
 
-      router.push(`/orders/${orderIdForResult}`);
+      router.push(`/orders/${orderIdForResult}`); // Navigate to the processed order's detail page
 
     } catch (error: any) {
-      console.error("Error finalizing bill:", error);
+      const actionType = (intent === 'edit' && originalOrderForEdit) ? "Update" : "Finalization";
+      console.error(`Error during bill ${actionType.toLowerCase()}:`, error);
       toast({
-        title: "Bill Finalization Failed",
-        description: error.message || "Could not save order or generate PDF. Please try again.",
+        title: `Bill ${actionType} Failed`,
+        description: error.message || `Could not ${actionType.toLowerCase()} order. Please try again.`,
         variant: "destructive",
+        duration: 7000,
       });
     }
   };
@@ -501,12 +516,12 @@ export default function BillingPageContent() {
                   </Button>
                 </div>
               )}
-               {!selectedCustomer && !customerSearchTerm && !searchedMobileForNotFound && (
+               {!selectedCustomer && !customerSearchTerm && !searchedMobileForNotFound && !(intent === 'edit' && originalOrderForEdit?.customerId) && (
                  <Alert variant="default" className="border-primary/50 text-primary bg-primary/5">
                     <Info className="h-5 w-5 !text-primary" />
                     <AlertTitle className="font-semibold">Tip</AlertTitle>
                     <AlertDescription>
-                    Search for an existing customer by mobile number, or proceed to add a new customer if not found. For a quick walk-in sale, you can skip this step and finalize the bill directly.
+                    Search for an existing customer or add a new one. You can also proceed without selecting a customer for a walk-in sale by leaving this section blank.
                     </AlertDescription>
                 </Alert>
                )}
@@ -549,4 +564,3 @@ export default function BillingPageContent() {
     </div>
   );
 }
-
