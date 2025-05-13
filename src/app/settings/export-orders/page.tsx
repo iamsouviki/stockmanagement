@@ -1,10 +1,11 @@
+// src/app/settings/export-orders/page.tsx
 'use client';
 
 import AuthGuard from '@/components/auth/AuthGuard';
 import type { UserRole } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, ArrowLeft, Calendar as CalendarIcon } from 'lucide-react';
+import { Download, ArrowLeft, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import Link from 'next/link';
@@ -12,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format, subDays } from "date-fns";
 import type { DateRange } from "react-day-picker";
+import { exportOrdersToCsv } from '@/actions/exportActions'; // Import the server action
 
 const allowedRoles: UserRole[] = ['owner'];
 
@@ -19,27 +21,50 @@ export default function ExportOrdersPage() {
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 29), // Default to last 30 days
+    from: subDays(new Date(), 29), 
     to: new Date(),
   });
 
 
   const handleExport = async () => {
     setIsExporting(true);
-    // Placeholder for actual export logic
-    // This would involve:
-    // 1. Calling a Genkit flow or Firebase function with the dateRange
-    // 2. The backend would fetch orders, format as CSV
-    // 3. The backend returns a CSV file or data URI
-    // 4. Client initiates download
-    
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
+    try {
+      const csvContent = await exportOrdersToCsv(dateRange);
 
-    toast({
-      title: "Export Initiated (Placeholder)",
-      description: `Orders from ${dateRange?.from ? format(dateRange.from, "LLL dd, y") : 'start'} to ${dateRange?.to ? format(dateRange.to, "LLL dd, y") : 'today'} would be exported. This is a placeholder action.`,
-    });
-    console.log("Exporting orders for date range:", dateRange);
+      if (!csvContent) {
+        toast({
+          title: "No Data to Export",
+          description: "No orders found for the selected date range.",
+        });
+        setIsExporting(false);
+        return;
+      }
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `PAS_Trading_CO_Orders_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Export Successful",
+        description: `Orders ${dateRange?.from ? `from ${format(dateRange.from, "LLL dd, y")}` : 'all'} to ${dateRange?.to ? format(dateRange.to, "LLL dd, y") : 'today'} have been exported.`,
+        className: "bg-green-500 text-white",
+      });
+
+    } catch (error: any) {
+      console.error("Error exporting orders:", error);
+      toast({
+        title: "Export Failed",
+        description: error.message || "Could not export orders. Please try again.",
+        variant: "destructive",
+      });
+    }
     setIsExporting(false);
   };
 
@@ -99,17 +124,15 @@ export default function ExportOrdersPage() {
                   />
                 </PopoverContent>
               </Popover>
-                <Button variant="ghost" size="sm" onClick={() => setDateRange(undefined)} className="ml-2 text-xs">
+                <Button variant="ghost" size="sm" onClick={() => setDateRange(undefined)} className="ml-2 text-xs text-muted-foreground hover:text-primary">
                     Clear Range (Export All)
                 </Button>
             </div>
             
             <Button onClick={handleExport} disabled={isExporting} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-              <Download className="mr-2 h-5 w-5" /> {isExporting ? "Exporting..." : "Export Orders to CSV"}
+              {isExporting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Download className="mr-2 h-5 w-5" />}
+              {isExporting ? "Exporting..." : "Export Orders to CSV"}
             </Button>
-             <p className="text-xs text-muted-foreground mt-2">
-                Note: This is a placeholder. Actual data export is not yet implemented.
-            </p>
           </CardContent>
         </Card>
       </div>

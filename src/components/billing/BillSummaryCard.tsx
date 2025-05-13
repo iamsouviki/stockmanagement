@@ -1,19 +1,21 @@
-
+// src/components/billing/BillSummaryCard.tsx
 "use client";
 
 import type { BillItem } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { FileText, Edit3 } from 'lucide-react'; // Added Edit3 for potential update icon
+import { FileText, Edit3, Loader2 } from 'lucide-react'; // Added Edit3 and Loader2
 
 interface BillSummaryCardProps {
   items: BillItem[];
   onFinalizeBill: () => void;
-  finalizeButtonText?: string; // Added prop
+  finalizeButtonText?: string;
+  isProcessing?: boolean; 
+  disabled?: boolean; 
 }
 
-const BillSummaryCard: React.FC<BillSummaryCardProps> = ({ items, onFinalizeBill, finalizeButtonText = "Finalize & Generate Bill" }) => {
+const BillSummaryCard: React.FC<BillSummaryCardProps> = ({ items, onFinalizeBill, finalizeButtonText = "Finalize & Generate Bill", isProcessing, disabled }) => {
   const subtotal = items.reduce((sum, item) => sum + item.price * item.billQuantity, 0);
   const taxRate = 0.18; 
   const taxAmount = subtotal * taxRate;
@@ -47,10 +49,11 @@ const BillSummaryCard: React.FC<BillSummaryCardProps> = ({ items, onFinalizeBill
         <Button 
           onClick={onFinalizeBill} 
           className="w-full bg-primary hover:bg-primary/90" 
-          disabled={items.length === 0}
+          disabled={disabled || items.length === 0 || isProcessing}
           size="lg" 
         >
-          <ButtonIcon className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> {finalizeButtonText}
+          {isProcessing ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ButtonIcon className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />}
+          {isProcessing ? (finalizeButtonText.toLowerCase().includes("update") ? "Updating..." : "Finalizing...") : finalizeButtonText}
         </Button>
       </CardFooter>
     </Card>
