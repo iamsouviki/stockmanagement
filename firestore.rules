@@ -3,82 +3,109 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user has a specific role
-    function hasRole(role) {
-      // Check if the user's document exists and has the specified role
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return userDoc.data != null && userDoc.data.role == role;
+    // Helper function to get user's role if document exists
+    function getUserRole(userId) {
+      let userDocPath = /databases/$(database)/documents/users/$(userId);
+      if (exists(userDocPath)) {
+        return get(userDocPath).data.role;
+      }
+      return null; // Return null if user document or role doesn't exist
     }
 
-    // Helper function to check if the user is the owner of the document being accessed
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return getUserRole(userId) == 'owner';
     }
 
-    // Products:
-    match /products/{productId} {
-      allow read: if request.auth != null && (hasRole('owner') || hasRole('admin') || hasRole('employee'));
-      allow create, delete: if request.auth != null && (hasRole('owner') || hasRole('admin'));
-      allow update: if request.auth != null && (hasRole('owner') || hasRole('admin') || hasRole('employee')); // Employee can update quantity
+    function isAdmin(userId) {
+      return getUserRole(userId) == 'admin';
     }
 
-    // Categories:
-    match /categories/{categoryId} {
-      allow read: if request.auth != null && (hasRole('owner') || hasRole('admin') || hasRole('employee'));
-      allow create, update, delete: if request.auth != null && (hasRole('owner') || hasRole('admin'));
+    function isEmployee(userId) {
+      return getUserRole(userId) == 'employee';
     }
 
-    // Customers:
-    match /customers/{customerId} {
-      allow read, create: if request.auth != null && (hasRole('owner') || hasRole('admin') || hasRole('employee'));
-      allow update, delete: if request.auth != null && (hasRole('owner') || hasRole('admin'));
-    }
-
-    // Orders:
-    match /orders/{orderId} {
-      allow read, create: if request.auth != null && (hasRole('owner') || hasRole('admin') || hasRole('employee'));
-      allow update, delete: if request.auth != null && hasRole('owner');
-    }
-
-    // Users:
+    // Users collection
     match /users/{userId} {
-      // Allow any authenticated user to read any user's profile.
-      // This is necessary for the client-side logic that checks if an 'owner' exists
-      // when a new user signs up. The app logic itself limits what data is shown based on role.
-      allow read: if request.auth != null;
+      // Allow read if user is reading their own profile OR if reader is owner/admin
+      allow read: if request.auth != null && (request.auth.uid == userId || isOwner(request.auth.uid) || isAdmin(request.auth.uid));
 
-      // Allow a user to create their own profile document if it doesn't exist yet.
-      // Also, allow existing 'owner' or 'admin' (to create employees) to create user profiles.
-      allow create: if request.auth != null &&
-                      (
-                        (isOwner(userId) && !existsAfter()) || // User creating their own profile
-                        hasRole('owner') || // Owner can create any user
-                        (hasRole('admin') && request.resource.data.role == 'employee') // Admin can create employees
-                      );
+      // Allow create if:
+      // 1. User is creating their own profile and it doesn't exist yet.
+      // 2. Creator is Owner.
+      // 3. Creator is Admin AND new user is 'employee'.
+      allow create: if request.auth != null && (
+                      (request.auth.uid == userId && !exists(/databases/$(database)/documents/users/$(userId))) ||
+                      isOwner(request.auth.uid) ||
+                      (isAdmin(request.auth.uid) && request.resource.data.role == 'employee')
+                    );
 
-      // Allow users to update their own profile (app should restrict fields like 'role').
-      // Allow 'owner' to update any user profile (except demoting other owners).
-      // Allow 'admin' to update 'employee' or other 'admin' profiles (cannot promote to owner or demote owners).
+      // Allow update if:
+      // 1. Updater is Owner (with restriction: cannot change an existing owner's role).
+      // 2. Updater is Admin (can update other admins or employees, cannot make anyone owner, cannot edit existing owner).
+      // 3. User is updating their own profile, but only non-role fields (role cannot be self-changed).
       allow update: if request.auth != null &&
-                      (
-                        (isOwner(userId) && (request.resource.data.role == resource.data.role || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']))) || // User updates self, role cannot change or is not in diff
-                        (hasRole('owner') && (resource.data.role != 'owner' || request.resource.data.role == 'owner')) || // Owner updates others, cannot change an owner's role from 'owner'
-                        (
-                          hasRole('admin') &&
-                          resource.data.role != 'owner' && // Admin cannot update an owner
-                          request.resource.data.role != 'owner' && // Admin cannot promote to owner
-                          (resource.data.role == 'employee' || (resource.data.role == 'admin' && request.resource.data.role == 'employee')) // Admin can update employee, or demote other admin to employee
-                        )
-                      );
+                       ( (isOwner(request.auth.uid) && !(resource.data.role == 'owner' && request.resource.data.role != 'owner')) ||
+                         (isAdmin(request.auth.uid) && (resource.data.role == 'admin' || resource.data.role == 'employee') && request.resource.data.role != 'owner' && !(resource.data.role == 'owner')) ||
+                         (request.auth.uid == userId && request.resource.data.role == resource.data.role) 
+                       );
 
-
-      // Allow 'owner' to delete any user except another 'owner'.
-      // Allow 'admin' to delete 'employee' users.
+      // Allow delete if:
+      // 1. Deleter is Owner AND target is not an owner.
+      // 2. Deleter is Admin AND target is an employee.
       allow delete: if request.auth != null &&
-                      (
-                        (hasRole('owner') && resource.data.role != 'owner') ||
-                        (hasRole('admin') && resource.data.role == 'employee')
-                      );
+                       ( (isOwner(request.auth.uid) && resource.data.role != 'owner') ||
+                         (isAdmin(request.auth.uid) && resource.data.role == 'employee') );
+    }
+
+    // For listing users collection:
+    // - Allow if authenticated and performing the specific owner check query (where role == 'owner', limit == 1)
+    // - OR if the requester is an Owner or Admin for general user management.
+    match /users {
+      allow list: if request.auth != null &&
+                     (
+                       (request.query.limit == 1 && request.query.filters.size() > 0 && request.query.filters[0].fieldPath == "role" && request.query.filters[0].op == "==" && request.query.filters[0].value == "owner" ) || // Specific for owner check
+                       isOwner(request.auth.uid) ||
+                       isAdmin(request.auth.uid)
+                     );
+    }
+
+    // Categories collection
+    match /categories/{categoryId} {
+      allow read: if request.auth != null; // Any authenticated user can read
+      // Owner, Admin, or Employee can create, update, delete
+      allow write: if request.auth != null && (isOwner(request.auth.uid) || isAdmin(request.auth.uid) || isEmployee(request.auth.uid));
+    }
+    match /categories {
+      allow list: if request.auth != null; // Any authenticated user can list
+    }
+
+    // Products collection
+    match /products/{productId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (isOwner(request.auth.uid) || isAdmin(request.auth.uid) || isEmployee(request.auth.uid));
+    }
+    match /products {
+      allow list: if request.auth != null;
+    }
+
+    // Customers collection
+    match /customers/{customerId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (isOwner(request.auth.uid) || isAdmin(request.auth.uid) || isEmployee(request.auth.uid));
+    }
+    match /customers {
+      allow list: if request.auth != null;
+    }
+
+    // Orders collection
+    match /orders/{orderId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && (isOwner(request.auth.uid) || isAdmin(request.auth.uid) || isEmployee(request.auth.uid));
+      allow update: if request.auth != null && (isOwner(request.auth.uid) || isAdmin(request.auth.uid));
+      allow delete: if request.auth != null && isOwner(request.auth.uid);
+    }
+    match /orders {
+      allow list: if request.auth != null;
     }
   }
 }
