@@ -2,7 +2,7 @@
 'use client';
 
 import AuthGuard from '@/components/auth/AuthGuard';
-import type { UserRole, Product } from '@/types';
+import type { UserRole } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,10 +13,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
-import { processBulkUpload } from '@/ai/flows/process-bulk-upload-flow'; // Import the flow
-import type { BulkProductEntry } from '@/ai/flows/process-bulk-upload-flow'; // Import the type
+import { processBulkUpload } from '@/ai/flows/process-bulk-upload-flow'; 
+import type { BulkProductEntry } from '@/schemas/productSchemas'; // Updated import path
 
-const allowedRoles: UserRole[] = ['owner', 'admin', 'employee']; // Updated roles
+const allowedRoles: UserRole[] = ['owner', 'admin', 'employee']; 
 
 export default function BulkUploadPage() {
   const { toast } = useToast();
@@ -130,7 +130,7 @@ export default function BulkUploadPage() {
           }));
         }
 
-        productsFromFile = productsFromFile.filter(p => p.Name && (p.SerialNumber || p.Barcode) && p.CategoryName); // Basic validation
+        productsFromFile = productsFromFile.filter(p => p.Name && (p.SerialNumber || p.Barcode) && p.CategoryName); 
 
         if(productsFromFile.length === 0){
             toast({ title: "No Valid Products", description: "No valid product entries found in the file. Ensure Name, SerialNumber/Barcode, and CategoryName are present.", variant: "destructive", duration: 7000 });
@@ -155,7 +155,7 @@ export default function BulkUploadPage() {
                     </ul>
                   </div>
                 ),
-                variant: "destructive", // Or "default" if some were successful
+                variant: "destructive", 
                 duration: 10000,
               });
         } else {
@@ -167,7 +167,7 @@ export default function BulkUploadPage() {
                      {flowResult.newCategoriesCreated && flowResult.newCategoriesCreated.length > 0 && <p>New categories created: {flowResult.newCategoriesCreated.join(', ')}</p>}
                   </div>
                 ),
-                className: "bg-green-500 text-white", // Custom success style
+                className: "bg-green-500 text-white", 
                 duration: 7000,
             });
         }
@@ -185,7 +185,7 @@ export default function BulkUploadPage() {
       console.error("Error during upload process:", error);
       toast({ title: "Upload Error", description: "An unexpected error occurred during upload.", variant: "destructive" });
     } finally {
-      // Reset file input after "upload"
+      
       const fileInput = document.getElementById('bulk-product-file') as HTMLInputElement;
       if (fileInput) fileInput.value = "";
       setFile(null);
