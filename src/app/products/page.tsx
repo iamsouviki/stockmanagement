@@ -24,7 +24,7 @@ import AuthGuard from "@/components/auth/AuthGuard";
 import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"; // Added CardDescription
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import PaginationControls from "@/components/shared/PaginationControls";
 import type { QueryDocumentSnapshot } from "firebase/firestore";
 
@@ -42,7 +42,7 @@ export default function ProductsPage() {
 
   // Filter states
   const [filterName, setFilterName] = useState("");
-  const [filterCategory, setFilterCategory] = useState(""); 
+  const [filterCategory, setFilterCategory] = useState("all"); // Default to "all"
   const [filterSerialNumber, setFilterSerialNumber] = useState("");
   const [filterBarcode, setFilterBarcode] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -155,7 +155,7 @@ export default function ProductsPage() {
     // For now, this filters the currently fetched page of products.
     return products.filter(product => {
       const nameMatch = filterName ? product.name.toLowerCase().includes(filterName.toLowerCase()) : true;
-      const categoryMatch = filterCategory ? product.categoryId === filterCategory : true;
+      const categoryMatch = filterCategory && filterCategory !== "all" ? product.categoryId === filterCategory : true;
       const serialMatch = filterSerialNumber ? product.serialNumber?.toLowerCase().includes(filterSerialNumber.toLowerCase()) : true;
       const barcodeMatch = filterBarcode ? product.barcode?.toLowerCase().includes(filterBarcode.toLowerCase()) : true;
       return nameMatch && categoryMatch && serialMatch && barcodeMatch;
@@ -250,7 +250,7 @@ export default function ProductsPage() {
   
   const resetFilters = () => {
     setFilterName("");
-    setFilterCategory("");
+    setFilterCategory("all");
     setFilterSerialNumber("");
     setFilterBarcode("");
     setShowFilters(false);
@@ -324,7 +324,7 @@ export default function ProductsPage() {
                   <SelectValue placeholder="Filter by Category..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Categories</SelectItem>
+                  <SelectItem value="all">All Categories</SelectItem>
                   {categories.map(category => (
                     <SelectItem key={category.id} value={category.id} className="text-sm">
                       {category.name}
