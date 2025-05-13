@@ -1,43 +1,19 @@
-{
-  "rules": {
-    "users": {
-      "$uid": {
-        // Authenticated users can read their own user document to get their role
-        ".read": "auth != null && auth.uid == $uid",
-        // Roles should ideally be managed by an admin/owner.
-        // User can update their profile if other fields are added, but not their role directly.
-        ".write": "auth != null && auth.uid == $uid && !('role' in request.resource.data)"
-      }
-    },
-    "categories": {
-      // All authenticated users can read categories
-      ".read": "auth != null",
-      // Owner and Employee can create, update, delete categories
-      ".write": "auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'employee']"
-    },
-    "products": {
-      ".read": "auth != null",
-      // Owner and Employee can create, update, delete products
-      ".write": "auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'employee']"
-    },
-    "customers": {
-      ".read": "auth != null",
-      // Owner and Employee can create, update, delete customers
-      ".write": "auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'employee']"
-    },
-    "orders": {
-      // All authenticated users can read orders (for history)
-      ".read": "auth != null",
-      // Creating orders (billing) should be allowed for employees and owners
-      ".create": "request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'employee']",
-      "$orderId": {
-        // Reading specific order is fine for any authenticated user
-        ".read": "auth != null",
-        // Only owner can modify orders (update).
-        ".update": "auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner'",
-        // Deletion of orders is generally not a good practice.
-        ".delete": "false"
-      }
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // This rule allows anyone with your Firestore database reference to view, edit,
+    // and delete all data in your Firestore database. It is useful for getting
+    // started, but it is configured to expire after 30 days because it
+    // leaves your app open to attackers. At that time, all client
+    // requests to your Firestore database will be denied.
+    //
+    // Make sure to write security rules for your app before that time, or else
+    // all client requests to your Firestore database will be denied until you Update
+    // your rules
+    match /{document=**} {
+      allow read, write: if request.time < timestamp.date(2025, 6, 12);
     }
   }
 }
