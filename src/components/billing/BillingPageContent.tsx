@@ -7,21 +7,23 @@ import BarcodeEntry from '@/components/billing/BarcodeEntry';
 import BillItemsList from '@/components/billing/BillItemsList';
 import BillSummaryCard from '@/components/billing/BillSummaryCard';
 import type { Product, BillItem, OrderItemData, Order, Customer } from '@/types';
+import { WALK_IN_CUSTOMER_ID } from '@/types'; // Import WALK_IN_CUSTOMER_ID
 import type { CustomerFormData } from '@/components/customers/CustomerForm';
 import CustomerDialog from '@/components/customers/CustomerDialog';
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal, UserSearch, PlusCircle } from "lucide-react";
-import jsPDF from 'jspdf';
-import { format } from 'date-fns';
+// import jsPDF from 'jspdf'; // No longer directly used here
+// import { format } from 'date-fns'; // No longer directly used here for PDF
 import { getProducts, addOrderAndDecrementStock, getOrder as getOrderById, findCustomerByMobile, getCustomer as getCustomerById, addCustomer } from '@/services/firebaseService';
 import { storeDetails } from '@/config/storeDetails';
-import { Timestamp } from 'firebase/firestore';
+// import { Timestamp } from 'firebase/firestore'; // No longer directly used here for PDF
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import BillingPageLoadingSkeleton from './BillingPageLoadingSkeleton'; // Import skeleton for initial load before fromOrderId logic
+import BillingPageLoadingSkeleton from './BillingPageLoadingSkeleton';
+import { generateInvoicePdf } from '@/lib/pdfGenerator'; // Import the new PDF utility
 
 export default function BillingPageContent() {
   const router = useRouter();
@@ -69,10 +71,10 @@ export default function BillingPageContent() {
               return {
                 ...item,
                 id: item.productId,
-                name: productDetails?.name || item.name, // Use product name from DB if available
-                price: productDetails?.price || item.price, // Use current price from DB
-                quantity: productDetails?.quantity ?? 0, // Stock quantity
-                billQuantity: item.billQuantity, // Quantity from original order
+                name: productDetails?.name || item.name,
+                price: productDetails?.price || item.price,
+                quantity: productDetails?.quantity ?? 0, 
+                billQuantity: item.billQuantity,
                 categoryId: productDetails?.categoryId ?? '',
                 serialNumber: item.serialNumber || productDetails?.serialNumber || '',
                 barcode: item.barcode || productDetails?.barcode || '',
@@ -81,18 +83,19 @@ export default function BillingPageContent() {
               };
             });
             setBillItems(itemsForBill);
-            if (order.customerId) {
+            if (order.customerId && order.customerId !== WALK_IN_CUSTOMER_ID) {
               const customer = await getCustomerById(order.customerId);
               setSelectedCustomer(customer);
               if (customer) setCustomerSearchTerm(customer.mobileNumber);
-            } else if (order.customerMobile) {
+            } else if (order.customerMobile && order.customerId === WALK_IN_CUSTOMER_ID) {
+               // For walk-in, but if mobile was captured, prefill search
               setCustomerSearchTerm(order.customerMobile);
-              await handleSearchCustomer(order.customerMobile);
+              // No need to auto-search if it was a walk-in, just prefill
             }
             toast({ title: "Order Loaded", description: `Items from order ${order.orderNumber} loaded for re-billing.` });
           } else {
             toast({ title: "Error", description: "Order not found for re-billing.", variant: "destructive" });
-            router.replace('/billing'); // Use replace to avoid history entry for invalid fromOrder
+            router.replace('/billing');
           }
         } catch (error) {
           console.error("Error loading order for re-bill:", error);
@@ -263,115 +266,6 @@ export default function BillingPageContent() {
     }
   };
 
-  const generateBillPDF = (order: Order, items: BillItem[]) => {
-    const doc = new jsPDF();
-    const pageHeight = doc.internal.pageSize.height;
-    const pageWidth = doc.internal.pageSize.width;
-    const margin = 15;
-    let yPos = margin;
-
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text(storeDetails.name, pageWidth / 2, yPos, { align: 'center' });
-    yPos += 7;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(storeDetails.storeType, pageWidth / 2, yPos, { align: 'center' });
-    yPos += 10;
-
-    doc.setFontSize(9);
-    doc.text(storeDetails.address, margin, yPos);
-    doc.text(storeDetails.contact, pageWidth - margin, yPos, { align: 'right' });
-    yPos += 5;
-    doc.text(`GSTIN: ${storeDetails.gstNo}`, margin, yPos);
-    yPos += 8;
-
-    doc.setLineWidth(0.5);
-    doc.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 8;
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('INVOICE', pageWidth / 2, yPos, { align: 'center' });
-    yPos += 8;
-
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Order No: ${order.orderNumber}`, margin, yPos);
-    const orderDateStr = order.orderDate instanceof Timestamp ? format(order.orderDate.toDate(), 'MMMM dd, yyyy HH:mm:ss') : String(order.orderDate);
-    doc.text(`Date: ${orderDateStr}`, pageWidth - margin, yPos, { align: 'right' });
-    yPos += 6;
-
-    if (selectedCustomer) {
-      doc.text(`Customer: ${selectedCustomer.name} (${selectedCustomer.mobileNumber})`, margin, yPos);
-      if (selectedCustomer.address) {
-        yPos += 5;
-        doc.text(`Address: ${selectedCustomer.address}`, margin, yPos);
-      }
-    } else if (order.customerName && order.customerMobile) {
-      doc.text(`Customer: ${order.customerName} (${order.customerMobile})`, margin, yPos);
-    } else {
-      doc.text(`Customer: Walk-in`, margin, yPos);
-    }
-    yPos += 10;
-
-    doc.setLineWidth(0.2);
-    doc.line(margin, yPos - 2, pageWidth - margin, yPos - 2);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    const headX = [margin, margin + 70, margin + 95, margin + 115, margin + 140];
-    doc.text('Product Name', headX[0], yPos);
-    doc.text('SN/Barcode', headX[1], yPos);
-    doc.text('Qty', headX[2], yPos, { align: 'right' });
-    doc.text('Price', headX[3], yPos, { align: 'right' });
-    doc.text('Subtotal', headX[4] + 30, yPos, { align: 'right' });
-    yPos += 5;
-    doc.line(margin, yPos - 2, pageWidth - margin, yPos - 2);
-    yPos += 3;
-
-    doc.setFont('helvetica', 'normal');
-    items.forEach(item => {
-      if (yPos > pageHeight - 40) {
-        doc.addPage();
-        yPos = margin;
-      }
-      const itemSubtotal = item.price * item.billQuantity;
-      doc.text(item.name, headX[0], yPos, { maxWidth: headX[1] - headX[0] - 5 });
-      doc.text(item.serialNumber || item.barcode || 'N/A', headX[1], yPos, { maxWidth: headX[2] - headX[1] - 5 });
-      doc.text(item.billQuantity.toString(), headX[2], yPos, { align: 'right' });
-      doc.text(`₹${item.price.toFixed(2)}`, headX[3], yPos, { align: 'right' });
-      doc.text(`₹${itemSubtotal.toFixed(2)}`, headX[4] + 30, yPos, { align: 'right' });
-      yPos += 6;
-    });
-
-    yPos += 5;
-    const summaryX = pageWidth - margin - 50;
-    doc.line(summaryX - 20, yPos, pageWidth - margin, yPos);
-    yPos += 5;
-
-    doc.setFontSize(10);
-    doc.text('Subtotal:', summaryX, yPos, { align: 'right' });
-    doc.text(`₹${order.subtotal.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
-    yPos += 6;
-
-    const taxRate = 0.18; // Ensure this matches the calculation
-    doc.text(`GST (${(taxRate * 100).toFixed(0)}%):`, summaryX, yPos, { align: 'right' });
-    doc.text(`₹${order.taxAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
-    yPos += 6;
-
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.line(summaryX - 20, yPos, pageWidth - margin, yPos);
-    yPos += 6;
-    doc.text('Total Amount:', summaryX, yPos, { align: 'right' });
-    doc.text(`₹${order.totalAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
-    yPos += 15;
-
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'italic');
-    doc.text('Thank you for your business! - Generated by StockPilot', pageWidth / 2, pageHeight - 10, { align: 'center' });
-
-    doc.save(`StockPilot-Bill-${order.orderNumber}.pdf`);
-  };
 
   const handleFinalizeBill = async () => {
     if (billItems.length === 0) {
@@ -384,7 +278,7 @@ export default function BillingPageContent() {
     }
 
     const subtotal = billItems.reduce((sum, item) => sum + item.price * item.billQuantity, 0);
-    const taxRate = 0.18; // Updated tax rate to 18%
+    const taxRate = 0.18;
     const taxAmount = subtotal * taxRate;
     const totalAmount = subtotal + taxAmount;
 
@@ -400,9 +294,9 @@ export default function BillingPageContent() {
     }));
 
     const orderData: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'> = {
-      customerId: selectedCustomer?.id || null,
-      customerName: selectedCustomer?.name || null,
-      customerMobile: selectedCustomer?.mobileNumber || null,
+      customerId: selectedCustomer?.id || WALK_IN_CUSTOMER_ID,
+      customerName: selectedCustomer?.name || "Walk-in Customer",
+      customerMobile: selectedCustomer?.mobileNumber || "N/A",
       items: orderItems,
       subtotal,
       taxAmount,
@@ -416,22 +310,22 @@ export default function BillingPageContent() {
 
     try {
       const newOrderId = await addOrderAndDecrementStock(orderData, itemsToDecrementStock);
-      const newOrder = await getOrderById(newOrderId);
+      const newOrder = await getOrderById(newOrderId); // Fetch the complete order with server timestamps
       if (!newOrder) {
         throw new Error("Failed to retrieve the newly created order for PDF generation.");
       }
 
-      generateBillPDF(newOrder, billItems);
+      generateInvoicePdf(newOrder, storeDetails); // Use the utility
 
       toast({
-        title: "Bill Generated!",
-        description: "Order saved and PDF has been downloaded.",
+        title: "Bill Sent for Printing!",
+        description: `Order ${newOrder.orderNumber} saved. PDF is opening for print.`,
         className: "bg-green-500 text-white",
       });
       setBillItems([]);
       handleClearCustomer();
-      fetchProductData();
-      if (fromOrderId) router.replace('/billing');
+      fetchProductData(); // Refresh product stock
+      if (fromOrderId) router.replace('/billing'); // Clear fromOrder query param
     } catch (error) {
       console.error("Error finalizing bill:", error);
       toast({

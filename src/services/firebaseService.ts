@@ -17,6 +17,7 @@ import {
   startAfter,
 } from 'firebase/firestore';
 import type { Product, Customer, Category, Order, OrderItemData } from '@/types';
+import { WALK_IN_CUSTOMER_ID } from '@/types'; // Import WALK_IN_CUSTOMER_ID
 import { format } from 'date-fns';
 
 // Generic CRUD operations
@@ -96,18 +97,30 @@ export const findCustomerByMobile = async (mobileNumber: string): Promise<Custom
 export const getOrders = () => getCollection<Order>('orders', 'orderDate', 'desc');
 export const getOrder = (id: string) => getDocument<Order>('orders', id);
 
-export const addOrderAndDecrementStock = async (orderData: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt'>, itemsToDecrement: { productId: string, quantity: number }[]): Promise<string> => {
+export const addOrderAndDecrementStock = async (
+  orderData: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'>,
+  itemsToDecrement: { productId: string, quantity: number }[]
+): Promise<string> => {
   const batch = writeBatch(db);
 
   // 1. Generate Order Number and set Order Date
   const now = new Date();
   const orderNumber = `ORD-${format(now, 'yyyyMMdd-HHmmssSSS')}`;
+  
+  // Ensure customerId is always set, using WALK_IN_CUSTOMER_ID if necessary
+  const finalCustomerId = orderData.customerId || WALK_IN_CUSTOMER_ID;
+  const finalCustomerName = orderData.customerName || (finalCustomerId === WALK_IN_CUSTOMER_ID ? "Walk-in Customer" : null);
+  const finalCustomerMobile = orderData.customerMobile || (finalCustomerId === WALK_IN_CUSTOMER_ID ? "N/A" : null);
+
   const newOrderDataWithTimestamp = {
     ...orderData,
+    customerId: finalCustomerId,
+    customerName: finalCustomerName,
+    customerMobile: finalCustomerMobile,
     orderNumber,
-    orderDate: Timestamp.fromDate(now), // Use Firestore Timestamp
+    orderDate: Timestamp.fromDate(now),
     createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(), // Add updatedAt for orders as well
+    updatedAt: serverTimestamp(),
   };
 
   // 2. Create a new order document reference
@@ -120,15 +133,14 @@ export const addOrderAndDecrementStock = async (orderData: Omit<Order, 'id' | 'o
     const productSnap = await getDoc(productRef);
     if (productSnap.exists()) {
       const currentStock = productSnap.data().quantity || 0;
-      const newStock = Math.max(0, currentStock - item.quantity); // Ensure stock doesn't go negative
+      const newStock = Math.max(0, currentStock - item.quantity);
       batch.update(productRef, { quantity: newStock, updatedAt: serverTimestamp() });
     } else {
-      // Handle case where product might not exist - though UI should prevent this
       console.warn(`Product with ID ${item.productId} not found for stock decrement.`);
     }
   }
 
   // 4. Commit the batch
   await batch.commit();
-  return newOrderRef.id; // Return the new order ID
+  return newOrderRef.id;
 };

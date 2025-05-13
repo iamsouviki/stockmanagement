@@ -27,18 +27,18 @@ export interface OrderItemData {
   name: string;
   price: number; // Price at the time of sale
   billQuantity: number;
-  imageUrl?: string;
-  imageHint?: string;
-  serialNumber?: string; // Capture SN for items in order
-  barcode?: string; // Capture barcode for items in order
+  imageUrl?: string | null; // Ensure it can be null if not present
+  imageHint?: string | null; // Ensure it can be null if not present
+  serialNumber?: string | null; // Capture SN for items in order
+  barcode?: string | null; // Capture barcode for items in order
 }
 
 export interface Order {
   id: string; // Firebase document ID
   orderNumber: string; // Human-readable, e.g., YYYYMMDD-HHMMSS
-  customerId?: string;
-  customerName?: string; // Denormalized from Customer record
-  customerMobile?: string; // Denormalized
+  customerId: string; // Made non-optional. Use a placeholder for walk-in customers.
+  customerName?: string | null; // Denormalized from Customer record
+  customerMobile?: string | null; // Denormalized
   items: OrderItemData[];
   subtotal: number;
   taxAmount: number;
@@ -74,3 +74,4 @@ export interface StoreDetails {
   gstNo: string;
 }
 
+export const WALK_IN_CUSTOMER_ID = "WALK_IN_CUSTOMER";
