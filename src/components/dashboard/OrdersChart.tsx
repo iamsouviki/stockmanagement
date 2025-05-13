@@ -7,7 +7,7 @@ import {
   ChartContainer,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+// import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'; // Not used directly here
 import { getOrders } from '@/services/firebaseService';
 import type { Order } from '@/types';
 import { format, subDays, parseISO } from 'date-fns';
@@ -42,10 +42,16 @@ const OrdersChart = () => {
           if (order.orderDate instanceof Timestamp) {
             orderDateStr = format(order.orderDate.toDate(), 'yyyy-MM-dd');
           } else if (typeof order.orderDate === 'string') {
-            orderDateStr = format(parseISO(order.orderDate), 'yyyy-MM-dd');
+            try {
+              orderDateStr = format(parseISO(order.orderDate), 'yyyy-MM-dd');
+            } catch (e) {
+               console.warn("Could not parse orderDate string:", order.orderDate, e);
+               return; // Skip if date is invalid string
+            }
           } else if (order.orderDate instanceof Date) {
             orderDateStr = format(order.orderDate, 'yyyy-MM-dd');
           } else {
+            console.warn("Invalid orderDate type:", typeof order.orderDate, order.orderDate);
             return; // Skip if date is invalid
           }
           
@@ -71,11 +77,11 @@ const OrdersChart = () => {
   }, []);
 
   if (isLoading) {
-    return <Skeleton className="h-[250px] w-full" />;
+    return <Skeleton className="h-[250px] sm:h-[300px] w-full" />;
   }
 
   if (chartData.length === 0 && !isLoading) {
-    return <p className="text-center text-muted-foreground p-4">No order data available for the last 7 days.</p>;
+    return <p className="text-center text-muted-foreground p-4 h-[250px] sm:h-[300px] flex items-center justify-center">No order data available for the last 7 days.</p>;
   }
   
   const chartConfig = {
@@ -87,23 +93,24 @@ const OrdersChart = () => {
 
 
   return (
-    <ChartContainer config={chartConfig} className="min-h-[250px] w-full">
-      <ResponsiveContainer width="100%" height={250}>
-        <BarChart data={chartData} margin={{ top: 5, right: 20, left: 5, bottom: 5 }}> {/* Adjusted left margin */}
+    <ChartContainer config={chartConfig} className="min-h-[250px] sm:min-h-[300px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}> {/* Adjusted left margin for YAxis labels */}
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="date"
             tickLine={false}
             axisLine={false}
             tickMargin={8}
-            fontSize={12}
+            fontSize={10} // Slightly smaller font size for X-axis
           />
           <YAxis 
             tickLine={false} 
             axisLine={false} 
             tickMargin={8} 
-            fontSize={12}
+            fontSize={10} // Slightly smaller font size for Y-axis
             allowDecimals={false} 
+            width={25} // Give YAxis a bit more space
           />
           <Tooltip
             cursor={false}
