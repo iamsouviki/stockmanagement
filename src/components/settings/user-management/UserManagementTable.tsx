@@ -65,29 +65,53 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({ users, onEdit
     } else if (typeof (dateValue as any)?.toDate === 'function') {
       dateToFormat = (dateValue as any).toDate();
     } else {
-      return 'Invalid Date';
+      // Try to parse from UserProfile string format if needed
+      try {
+        dateToFormat = new Date(dateValue as string);
+         if (isNaN(dateToFormat.getTime())) throw new Error("Invalid date string from profile");
+      } catch(e) {
+        console.warn("Unformattable dateValue type in UserManagementTable:", typeof dateValue, dateValue, e);
+        return 'Invalid Date';
+      }
     }
 
     try {
       if (isNaN(dateToFormat.getTime())) return 'Invalid Date';
       return format(dateToFormat, 'PPp');
     } catch (e) {
+      console.error("Error formatting final Date object in UserManagementTable:", e, dateToFormat);
       return 'Error Date';
     }
   };
 
   const canEditUser = (userToEdit: UserProfile): boolean => {
     if (userToEdit.id === currentUserProfile.id) return false; // Cannot edit self
-    if (currentUserProfile.role === 'owner') return true; // Owner can edit anyone (except self's role effectively)
-    if (currentUserProfile.role === 'admin' && userToEdit.role === 'employee') return true; // Admin can edit employee
-    return false;
+    if (userToEdit.role === 'owner') return false; // Owner roles are not modified here
+
+    if (currentUserProfile.role === 'owner') {
+        // Owner can edit 'admin' or 'employee'
+        return userToEdit.role === 'admin' || userToEdit.role === 'employee';
+    }
+    if (currentUserProfile.role === 'admin') {
+        // Admin can edit other 'admin' (to demote to employee) or 'employee'. Cannot edit 'owner'.
+        return userToEdit.role === 'admin' || userToEdit.role === 'employee';
+    }
+    return false; // Employee cannot edit anyone
   };
 
   const canDeleteUser = (userToDelete: UserProfile): boolean => {
     if (userToDelete.id === currentUserProfile.id) return false; // Cannot delete self
-    if (currentUserProfile.role === 'owner' && userToDelete.role !== 'owner') return true; // Owner can delete admin/employee
-    if (currentUserProfile.role === 'admin' && userToDelete.role === 'employee') return true; // Admin can delete employee
-    return false;
+    if (userToDelete.role === 'owner') return false; // Owner roles are not deleted here
+
+    if (currentUserProfile.role === 'owner') {
+        // Owner can delete admin or employee
+        return userToDelete.role === 'admin' || userToDelete.role === 'employee';
+    }
+    if (currentUserProfile.role === 'admin') {
+        // Admin can delete employee. Admin cannot delete other Admin.
+        return userToDelete.role === 'employee';
+    }
+    return false; // Employee cannot delete anyone
   };
 
 
@@ -126,7 +150,11 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({ users, onEdit
                     <TableCell className="text-xs sm:text-sm px-2 sm:px-4">
                       <Badge 
                         variant={user.role === 'owner' ? 'default' : user.role === 'admin' ? 'destructive' : 'secondary'} 
-                        className={`capitalize flex items-center gap-1 w-fit text-xs ${user.role === 'owner' ? 'bg-amber-500 hover:bg-amber-600' : user.role === 'admin' ? 'bg-blue-500 hover:bg-blue-600' : 'bg-green-500 hover:bg-green-600'} text-white`}
+                        className={`capitalize flex items-center gap-1 w-fit text-xs ${
+                            user.role === 'owner' ? 'bg-amber-500 hover:bg-amber-600' : 
+                            user.role === 'admin' ? 'bg-blue-500 hover:bg-blue-600' : 
+                            'bg-green-500 hover:bg-green-600'
+                        } text-white`}
                       >
                         <RoleIcon role={user.role} />
                         {user.role}
