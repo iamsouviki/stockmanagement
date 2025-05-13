@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Category } from "@/types";
@@ -88,8 +89,7 @@ const CategoryTable: React.FC<CategoryTableProps> = ({ categories, onEdit, onDel
       </CardHeader>
       <CardContent>
         <ScrollArea className="w-full whitespace-nowrap rounded-md border">
-          <Table className="min-w-[600px] sm:min-w-full">
-            <TableHeader>
+          <Table className="min-w-[600px] sm:min-w-full"><TableHeader>
               <TableRow>
                 <TableHead className="w-[60px] sm:w-[80px] px-2 sm:px-4">Icon</TableHead>
                 <TableHead className="px-2 sm:px-4">Name</TableHead>
@@ -97,8 +97,7 @@ const CategoryTable: React.FC<CategoryTableProps> = ({ categories, onEdit, onDel
                 <TableHead className="px-2 sm:px-4">Last Updated</TableHead>
                 <TableHead className="text-center w-[100px] sm:w-[120px] px-2 sm:px-4">Actions</TableHead>
               </TableRow>
-            </TableHeader>
-            <TableBody>
+            </TableHeader><TableBody>
               {categories.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center text-sm sm:text-base">
@@ -151,8 +150,7 @@ const CategoryTable: React.FC<CategoryTableProps> = ({ categories, onEdit, onDel
                   </TableRow>
                 ))
               )}
-            </TableBody>
-          </Table>
+            </TableBody></Table>
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
       </CardContent>

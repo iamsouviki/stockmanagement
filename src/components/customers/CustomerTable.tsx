@@ -1,3 +1,4 @@
+
 "use client";
 
 import Image from 'next/image';
@@ -57,8 +58,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({ customers, onEdit, onDele
       </CardHeader>
       <CardContent>
         <ScrollArea className="w-full whitespace-nowrap rounded-md border">
-          <Table className="min-w-[700px] sm:min-w-full">
-            <TableHeader>
+          <Table className="min-w-[700px] sm:min-w-full"><TableHeader>
               <TableRow>
                 <TableHead className="w-[50px] sm:w-[60px] px-2 sm:px-4">Avatar</TableHead>
                 <TableHead className="px-2 sm:px-4">Name</TableHead>
@@ -67,8 +67,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({ customers, onEdit, onDele
                 <TableHead className="px-2 sm:px-4 max-w-[150px] sm:max-w-[200px]">Address</TableHead>
                 <TableHead className="text-center w-[100px] sm:w-[120px] px-2 sm:px-4">Actions</TableHead>
               </TableRow>
-            </TableHeader>
-            <TableBody>
+            </TableHeader><TableBody>
               {customers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center text-sm sm:text-base">
@@ -134,8 +133,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({ customers, onEdit, onDele
                   </TableRow>
                 ))
               )}
-            </TableBody>
-          </Table>
+            </TableBody></Table>
         <ScrollBar orientation="horizontal" />
         </ScrollArea>
       </CardContent>

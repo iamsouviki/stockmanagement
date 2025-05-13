@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -171,8 +172,7 @@ export default function OrderDetailPage() {
             <div>
               <h3 className="font-semibold text-md sm:text-lg mb-2">Items Ordered</h3>
               <ScrollArea className="w-full whitespace-nowrap rounded-md border">
-                <Table className="min-w-[600px] sm:min-w-full">
-                  <TableHeader>
+                <Table className="min-w-[600px] sm:min-w-full"><TableHeader>
                     <TableRow>
                       <TableHead className="w-[50px] sm:w-[60px] px-2 sm:px-4">Image</TableHead>
                       <TableHead className="px-2 sm:px-4">Product</TableHead>
@@ -181,8 +181,7 @@ export default function OrderDetailPage() {
                       <TableHead className="text-center px-2 sm:px-4">Quantity</TableHead>
                       <TableHead className="text-right px-2 sm:px-4">Subtotal</TableHead>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                  </TableHeader><TableBody>
                     {order.items.map((item, index) => (
                       <TableRow key={item.productId + index}>
                         <TableCell className="px-2 sm:px-4">
@@ -208,8 +207,7 @@ export default function OrderDetailPage() {
                         <TableCell className="text-right text-xs sm:text-sm px-2 sm:px-4">₹{(item.price * item.billQuantity).toFixed(2)}</TableCell>
                       </TableRow>
                     ))}
-                  </TableBody>
-                </Table>
+                  </TableBody></Table>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
             </div>

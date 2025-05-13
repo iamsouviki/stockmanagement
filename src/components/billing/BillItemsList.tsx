@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { BillItem } from '@/types';
@@ -38,8 +39,7 @@ const BillItemsList: React.FC<BillItemsListProps> = ({ items, onRemoveItem, onUp
       </CardHeader>
       <CardContent>
         <ScrollArea className="w-full whitespace-nowrap rounded-md border">
-          <Table className="min-w-[600px] sm:min-w-full"> {/* Ensure table has a min-width for small screens before scroll */}
-            <TableHeader>
+          <Table className="min-w-[600px] sm:min-w-full"><TableHeader>
               <TableRow>
                 <TableHead className="w-[50px] sm:w-[60px] px-2 sm:px-4">Image</TableHead>
                 <TableHead className="px-2 sm:px-4">Product</TableHead>
@@ -48,8 +48,7 @@ const BillItemsList: React.FC<BillItemsListProps> = ({ items, onRemoveItem, onUp
                 <TableHead className="text-right px-2 sm:px-4">Subtotal</TableHead>
                 <TableHead className="text-center w-[60px] sm:w-[80px] px-2 sm:px-4">Remove</TableHead>
               </TableRow>
-            </TableHeader>
-            <TableBody>
+            </TableHeader><TableBody>
               {items.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center text-sm sm:text-base">
@@ -103,8 +102,7 @@ const BillItemsList: React.FC<BillItemsListProps> = ({ items, onRemoveItem, onUp
                   </TableRow>
                 ))
               )}
-            </TableBody>
-          </Table>
+            </TableBody></Table>
         <ScrollBar orientation="horizontal" />
         </ScrollArea>
       </CardContent>

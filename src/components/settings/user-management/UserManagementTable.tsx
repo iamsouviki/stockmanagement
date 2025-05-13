@@ -1,3 +1,4 @@
+
 // src/components/settings/user-management/UserManagementTable.tsx
 "use client";
 
@@ -123,8 +124,7 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({ users, onEdit
       </CardHeader>
       <CardContent>
         <ScrollArea className="w-full whitespace-nowrap rounded-md border">
-          <Table className="min-w-[700px] sm:min-w-full">
-            <TableHeader>
+          <Table className="min-w-[700px] sm:min-w-full"><TableHeader>
               <TableRow>
                 <TableHead className="px-2 sm:px-4">Name</TableHead>
                 <TableHead className="px-2 sm:px-4">Email</TableHead>
@@ -133,8 +133,7 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({ users, onEdit
                 <TableHead className="px-2 sm:px-4">Created At</TableHead>
                 <TableHead className="text-center w-[100px] sm:w-[120px] px-2 sm:px-4">Actions</TableHead>
               </TableRow>
-            </TableHeader>
-            <TableBody>
+            </TableHeader><TableBody>
               {users.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center text-sm sm:text-base">
@@ -201,8 +200,7 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({ users, onEdit
                   </TableRow>
                 ))
               )}
-            </TableBody>
-          </Table>
+            </TableBody></Table>
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
       </CardContent>
