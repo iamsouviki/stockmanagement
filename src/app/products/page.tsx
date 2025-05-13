@@ -1,3 +1,4 @@
+// src/app/products/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,15 +7,17 @@ import ProductTable from "@/components/products/ProductTable";
 import ProductDialog from "@/components/products/ProductDialog";
 import type { ProductFormData } from "@/components/products/ProductForm";
 import type { Product, Category, UserRole } from "@/types";
-import { PlusCircle, Info } from "lucide-react";
+import { PlusCircle, UploadCloud } from "lucide-react"; // Added UploadCloud
 import { useToast } from "@/hooks/use-toast";
 import { getProducts, addProduct, updateProduct, deleteProduct, getCategories } from "@/services/firebaseService";
 import { Skeleton } from "@/components/ui/skeleton"; 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Link from "next/link";
 import AuthGuard from "@/components/auth/AuthGuard";
+import { useAuth } from "@/hooks/useAuth"; // Import useAuth
 
-const allowedRoles: UserRole[] = ['owner', 'employee'];
+const pageAccessRoles: UserRole[] = ['owner', 'admin', 'employee'];
+const bulkUploadRoles: UserRole[] = ['owner'];
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -23,6 +26,7 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const { userProfile } = useAuth(); // Get userProfile for role check
 
   useEffect(() => {
     const fetchData = async () => {
@@ -143,7 +147,7 @@ export default function ProductsPage() {
   };
 
   return (
-    <AuthGuard allowedRoles={allowedRoles}>
+    <AuthGuard allowedRoles={pageAccessRoles}>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
           <div>
@@ -152,9 +156,18 @@ export default function ProductsPage() {
               Manage your electronic store's inventory here.
             </p>
           </div>
-          <Button onClick={handleAddProduct} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
-            <PlusCircle className="mr-2 h-5 w-5" /> Add New Product
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            {userProfile && bulkUploadRoles.includes(userProfile.role) && (
+              <Button asChild variant="outline" className="w-full sm:w-auto border-accent text-accent hover:bg-accent/10 hover:text-accent">
+                <Link href="/settings/bulk-upload">
+                  <UploadCloud className="mr-2 h-5 w-5" /> Bulk Upload
+                </Link>
+              </Button>
+            )}
+            <Button onClick={handleAddProduct} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
+              <PlusCircle className="mr-2 h-5 w-5" /> Add New Product
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -168,7 +181,8 @@ export default function ProductsPage() {
           <>
             {categories.length === 0 && (
               <Alert variant="default" className="border-accent text-accent bg-accent/10">
-                <Info className="h-5 w-5 !text-accent" />
+                {/* Using a generic icon or removing Info if not critical */}
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 !text-accent"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
                 <AlertTitle className="font-semibold">No Categories Available</AlertTitle>
                 <AlertDescription>
                   You currently have no product categories defined. Please 

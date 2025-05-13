@@ -1,3 +1,4 @@
+// src/app/orders/page.tsx
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -9,13 +10,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import AuthGuard from '@/components/auth/AuthGuard';
+import { useAuth } from '@/hooks/useAuth'; // Import useAuth
+import { Download } from 'lucide-react'; // Import Download icon
 
-const allowedRoles: UserRole[] = ['owner', 'employee'];
+const pageAccessRoles: UserRole[] = ['owner', 'admin', 'employee'];
+const exportOrderRoles: UserRole[] = ['owner'];
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const { userProfile } = useAuth(); // Get userProfile
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -33,7 +38,7 @@ export default function OrdersPage() {
   }, [toast]);
 
   return (
-    <AuthGuard allowedRoles={allowedRoles}>
+    <AuthGuard allowedRoles={pageAccessRoles}>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
           <div>
@@ -42,9 +47,18 @@ export default function OrdersPage() {
               View and manage past orders.
               </p>
           </div>
-          <Button asChild className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
-              <Link href="/billing">Create New Bill</Link>
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            {userProfile && exportOrderRoles.includes(userProfile.role) && (
+                <Button asChild variant="outline" className="w-full sm:w-auto border-accent text-accent hover:bg-accent/10 hover:text-accent">
+                    <Link href="/settings/export-orders">
+                        <Download className="mr-2 h-5 w-5" /> Export Orders
+                    </Link>
+                </Button>
+            )}
+            <Button asChild className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
+                <Link href="/billing">Create New Bill</Link>
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (

@@ -1,13 +1,17 @@
+// src/app/page.tsx
+'use client'; // Required for useAuth hook
+
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Boxes, Receipt, ArrowRight, Users, History, BarChart3, PieChart, Tags, SettingsIcon, UserCog } from 'lucide-react'; 
+import { Boxes, Receipt, ArrowRight, Users, History, BarChart3, PieChart, Tags, SettingsIcon } from 'lucide-react'; 
 import { Suspense } from 'react';
 import OrdersChart from '@/components/dashboard/OrdersChart';
 import StockOverviewChart from '@/components/dashboard/StockOverviewChart';
 import { Skeleton } from '@/components/ui/skeleton';
 import AuthGuard from '@/components/auth/AuthGuard'; 
 import type { UserRole } from '@/types';
+import { useAuth } from '@/hooks/useAuth'; // Import useAuth
 
 function ChartSkeleton() {
   return <Skeleton className="h-[300px] w-full rounded-lg" />;
@@ -18,13 +22,25 @@ const billingRoles: UserRole[] = ['owner', 'admin', 'employee'];
 const categoryManagementRoles: UserRole[] = ['owner', 'admin', 'employee'];
 const orderHistoryRoles: UserRole[] = ['owner', 'admin', 'employee'];
 const customerManagementRoles: UserRole[] = ['owner', 'admin', 'employee'];
-const settingsRoles: UserRole[] = ['owner', 'admin']; // Admins can now access settings
+const settingsRoles: UserRole[] = ['owner', 'admin'];
 
 
 export default function DashboardPage() {
+  const { userProfile, isLoading } = useAuth(); // Get userProfile
+
+  const welcomeMessage = isLoading 
+    ? "Loading..." 
+    : userProfile?.displayName 
+      ? `Welcome, ${userProfile.displayName}!` 
+      : "Welcome!";
+
   return (
     <AuthGuard> 
       <div className="space-y-6 md:space-y-8">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">
+          {welcomeMessage}
+        </h1>
+
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
           <Card className="shadow-lg">
             <CardHeader>
@@ -63,7 +79,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <CardDescription className="mb-3 sm:mb-4 text-sm sm:text-base">
-                  View, add, and update your product inventory.
+                  View, add, update inventory, and perform bulk uploads.
                 </CardDescription>
                 <Button asChild variant="default" className="w-full sm:w-auto bg-primary hover:bg-primary/90">
                   <Link href="/products">
@@ -120,7 +136,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <CardDescription className="mb-3 sm:mb-4 text-sm sm:text-base">
-                  View past orders and generate duplicate bills if needed.
+                  View past orders, export data, and re-create bills.
                 </CardDescription>
                 <Button asChild variant="default" className="w-full sm:w-auto bg-primary hover:bg-primary/90">
                   <Link href="/orders">
@@ -153,16 +169,16 @@ export default function DashboardPage() {
           <AuthGuard allowedRoles={settingsRoles} redirectPath='/login'>
             <Card className="shadow-lg hover:shadow-xl transition-shadow sm:col-span-2 lg:col-span-2 xl:col-span-2"> 
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-xl sm:text-2xl font-semibold">Settings</CardTitle>
+                <CardTitle className="text-xl sm:text-2xl font-semibold">User Settings</CardTitle>
                 <SettingsIcon className="h-7 w-7 sm:h-8 sm:w-8 text-accent" />
               </CardHeader>
               <CardContent>
                 <CardDescription className="mb-3 sm:mb-4 text-sm sm:text-base">
-                  Manage application settings, users, bulk uploads, and exports.
+                  Manage user accounts and logout from your session.
                 </CardDescription>
                 <Button asChild variant="default" className="w-full sm:w-auto bg-primary hover:bg-primary/90">
                   <Link href="/settings">
-                    Go to Settings <ArrowRight className="ml-2 h-4 w-4" />
+                    Go to User Settings <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
               </CardContent>
