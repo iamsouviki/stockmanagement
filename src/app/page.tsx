@@ -2,20 +2,20 @@
 'use client'; 
 
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Removed CardFooter as it's not directly used at the top level of this page for all cards
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Boxes, Receipt, ArrowRight, Users, History, BarChart3, LineChart, Tags, UserCog } from 'lucide-react'; 
+import { Boxes, Receipt, ArrowRight, Users, History, BarChart3, LineChart, Tags, UserCog, DollarSign } from 'lucide-react'; 
 import { Suspense } from 'react';
 import OrdersChart from '@/components/dashboard/OrdersChart';
 import TopSellingProductsChart from '@/components/dashboard/TopSellingProductsChart';
+import RevenueChart from '@/components/dashboard/RevenueChart'; // Import RevenueChart
 import { Skeleton } from '@/components/ui/skeleton';
 import AuthGuard from '@/components/auth/AuthGuard'; 
 import type { UserRole } from '@/types';
 import { useAuth } from '@/hooks/useAuth'; 
-import { CardFooter } from "@/components/ui/card"; // Explicitly import CardFooter where needed
 
 function ChartSkeleton() {
-  return <Skeleton className="h-[280px] sm:h-[320px] w-full rounded-lg" />;
+  return <Skeleton className="h-[300px] sm:h-[350px] w-full rounded-lg" />;
 }
 
 const productManagementRoles: UserRole[] = ['owner', 'admin', 'employee'];
@@ -46,6 +46,22 @@ export default function DashboardPage() {
           {welcomeMessage}
         </h1>
 
+        <section className="grid grid-cols-1 gap-6 md:gap-8">
+          <Card className="shadow-lg col-span-1">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-md sm:text-lg text-primary flex items-center">
+                <DollarSign className="mr-2 h-5 w-5" /> Daily Revenue (Last 7 Days)
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Total revenue generated each day.</CardDescription>
+            </CardHeader>
+            <CardContent className="min-h-[300px] sm:min-h-[350px] px-1 sm:px-2 md:px-4">
+              <Suspense fallback={<ChartSkeleton />}>
+                <RevenueChart />
+              </Suspense>
+            </CardContent>
+          </Card>
+        </section>
+
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
           <Card className="shadow-lg col-span-1">
             <CardHeader className="pb-4">
@@ -54,7 +70,7 @@ export default function DashboardPage() {
               </CardTitle>
               <CardDescription className="text-xs sm:text-sm">Daily order volume.</CardDescription>
             </CardHeader>
-            <CardContent className="min-h-[280px] sm:min-h-[320px] px-1 sm:px-2 md:px-4"> {/* Adjusted padding */}
+            <CardContent className="min-h-[280px] sm:min-h-[320px] px-1 sm:px-2 md:px-4">
               <Suspense fallback={<ChartSkeleton />}>
                 <OrdersChart />
               </Suspense>
@@ -67,7 +83,7 @@ export default function DashboardPage() {
               </CardTitle>
               <CardDescription className="text-xs sm:text-sm">Units sold for top products.</CardDescription>
             </CardHeader>
-            <CardContent className="min-h-[280px] sm:min-h-[320px] px-1 sm:px-2 md:px-4"> {/* Adjusted padding */}
+            <CardContent className="min-h-[280px] sm:min-h-[320px] px-1 sm:px-2 md:px-4">
               <Suspense fallback={<ChartSkeleton />}>
                 <TopSellingProductsChart />
               </Suspense>

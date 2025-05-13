@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, LabelList } from 'recharts';
 import {
   ChartContainer,
   ChartTooltipContent,
@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface ProductSalesData {
   name: string;
+  originalName: string;
   quantitySold: number;
 }
 
@@ -45,7 +46,6 @@ const TopSellingProductsChart = () => {
           .slice(0, 5); 
 
         const productDetailsPromises = sortedProductSales.map(async ([productId, data]) => {
-          // Use name from order item if available, otherwise fetch
           let productName = data.name;
           if (!productName) {
             const product = await getProduct(productId);
@@ -53,8 +53,8 @@ const TopSellingProductsChart = () => {
           }
           
           return {
-            name: productName.length > 12 ? `${productName.substring(0, 10)}...` : productName, // Shorten for Y-axis
-            originalName: productName, // Keep original for tooltip
+            name: productName.length > 15 ? `${productName.substring(0, 12)}...` : productName, 
+            originalName: productName, 
             quantitySold: data.quantity,
           };
         });
@@ -88,7 +88,6 @@ const TopSellingProductsChart = () => {
       label: "Units Sold",
       color: "hsl(var(--chart-2))", 
     },
-     // Add this to ensure originalName is available in tooltip config
     originalName: {
       label: "Product Name",
     }
@@ -100,7 +99,7 @@ const TopSellingProductsChart = () => {
         <BarChart 
           data={chartData} 
           layout="vertical" 
-          margin={{ top: 5, right: 10, left: 0, bottom: 0 }} // Adjusted margins
+          margin={{ top: 5, right: 25, left: 0, bottom: 5 }} // Increased right margin for labels
         >
           <CartesianGrid strokeDasharray="3 3" horizontal={false} />
           <XAxis 
@@ -108,7 +107,7 @@ const TopSellingProductsChart = () => {
             tickLine={false} 
             axisLine={false} 
             tickMargin={8} 
-            fontSize={9} // Reduced font size
+            fontSize={10} 
             allowDecimals={false} 
           />
           <YAxis
@@ -117,8 +116,8 @@ const TopSellingProductsChart = () => {
             tickLine={false}
             axisLine={false}
             tickMargin={5}
-            fontSize={9} // Reduced font size
-            width={70} // Adjusted width for Y-axis labels
+            fontSize={10} 
+            width={80} // Adjusted width for Y-axis labels
             interval={0} 
           />
           <Tooltip
@@ -142,8 +141,10 @@ const TopSellingProductsChart = () => {
             dataKey="quantitySold" 
             fill="var(--color-quantitySold)" 
             radius={[0, 4, 4, 0]} 
-            barSize={18} // Adjusted bar size
-          />
+            barSize={20} // Adjusted bar size
+          >
+            <LabelList dataKey="quantitySold" position="right" offset={5} fontSize={9} />
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </ChartContainer>
