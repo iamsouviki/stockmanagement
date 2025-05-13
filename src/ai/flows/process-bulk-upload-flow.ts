@@ -5,12 +5,11 @@
  * @fileOverview Handles bulk product uploads.
  *
  * - processBulkUpload - A function that processes an array of product data from a file.
- * - BulkProductEntry - The type for a single product entry from the file. (Imported)
- * - ProcessBulkUploadInput - The input type for the processBulkUpload function.
- * - ProcessBulkUploadOutput - The return type for the processBulkUpload function.
+ * - ProcessBulkUploadInput - The input type for the processBulkUpload function. (Exported)
+ * - ProcessBulkUploadOutput - The return type for the processBulkUpload function. (Exported)
  */
 
-import { z } from 'zod'; // Corrected Zod import
+import { z } from 'zod'; // For inferring types
 import { 
   findCategoryByNameOrCreate, 
   addProduct,
@@ -19,24 +18,19 @@ import {
   getCategories 
 } from '@/services/firebaseService';
 import type { Product, Category } from '@/types';
-// Import from the new schemas file
-import { BulkProductEntrySchema, type BulkProductEntry } from '@/schemas/productSchemas';
+// Import SCHEMAS and their inferred TYPES from the schemas file
+import { 
+  BulkProductEntrySchema, // Schema for internal use
+  ProcessBulkUploadInputSchema,
+  ProcessBulkUploadOutputSchema,
+  // Types are defined below using z.infer or imported directly
+} from '@/schemas/productSchemas';
 
-// Input schema for the function
-export const ProcessBulkUploadInputSchema = z.object({
-  products: z.array(BulkProductEntrySchema),
-});
+// Define and export types locally by inferring from the imported schemas
 export type ProcessBulkUploadInput = z.infer<typeof ProcessBulkUploadInputSchema>;
-
-// Output schema for the function
-export const ProcessBulkUploadOutputSchema = z.object({
-  successCount: z.number(),
-  errorCount: z.number(),
-  errors: z.array(z.string()),
-  newCategoriesCreated: z.array(z.string()),
-  message: z.string(),
-});
 export type ProcessBulkUploadOutput = z.infer<typeof ProcessBulkUploadOutputSchema>;
+// Import BulkProductEntry type if used by name within this file (e.g. in function signature or variable types)
+import type { BulkProductEntry } from '@/schemas/productSchemas';
 
 
 // Wrapper function to be called by the client
@@ -54,9 +48,11 @@ export async function processBulkUpload(input: ProcessBulkUploadInput): Promise<
   const productMapBySN = new Map(existingProducts.filter(p => p.serialNumber).map(p => [p.serialNumber, p]));
   const productMapByBarcode = new Map(existingProducts.filter(p => p.barcode).map(p => [p.barcode, p]));
 
-  for (const [index, productEntry] of input.products.entries()) {
+  for (const [index, productEntryUntyped] of input.products.entries()) {
+    // Ensure productEntry is correctly typed as BulkProductEntry for intellisense and type safety
+    const productEntry = productEntryUntyped as BulkProductEntry;
     try {
-      // Validate individual entry (optional, as array schema already does this, but good for early exit)
+      // Validate individual entry
       const parsedEntry = BulkProductEntrySchema.safeParse(productEntry);
       if (!parsedEntry.success) {
         const formattedErrors = parsedEntry.error.errors.map(err => err.message).join(', ');
@@ -75,7 +71,7 @@ export async function processBulkUpload(input: ProcessBulkUploadInput): Promise<
          errorCount++;
          continue;
       }
-      // Redundant due to .refine, but kept for explicitness if refine is ever removed.
+      // Redundant due to .refine in BulkProductEntrySchema, but kept for explicitness if refine is ever removed.
       if (!productEntry.SerialNumber && !productEntry.Barcode) {
         errors.push(`Row ${index + 2}: Missing SerialNumber and Barcode for product '${productEntry.Name}'. Provide at least one.`);
         errorCount++;
@@ -158,4 +154,3 @@ export async function processBulkUpload(input: ProcessBulkUploadInput): Promise<
     message,
   };
 }
-
