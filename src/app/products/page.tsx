@@ -15,7 +15,7 @@ import {
   updateProduct, 
   deleteProduct, 
   getCategories,
-  getProducts // Keep for initial data or scenarios without pagination if any
+  // getProducts // Keep for initial data or scenarios without pagination if any
 } from "@/services/firebaseService";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -24,7 +24,7 @@ import AuthGuard from "@/components/auth/AuthGuard";
 import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"; // Added CardDescription
 import PaginationControls from "@/components/shared/PaginationControls";
 import type { QueryDocumentSnapshot } from "firebase/firestore";
 
@@ -230,8 +230,8 @@ export default function ProductsPage() {
       } else {
         await addProduct({
           ...productData,
-          imageUrl: `https://picsum.photos/seed/${encodeURIComponent(data.name)}/200/200`,
-          imageHint: `${data.name.split(' ')[0].toLowerCase()} device`,
+          imageUrl: `https://picsum.photos/seed/${encodeURIComponent(data.name.split(" ")[0])}/200/200`,
+          imageHint: `${data.name.split(' ')[0].toLowerCase()} item`,
         });
       }
       // Refetch current page to reflect changes
@@ -403,3 +403,4 @@ export default function ProductsPage() {
     </AuthGuard>
   );
 }
+
