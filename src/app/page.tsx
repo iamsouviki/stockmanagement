@@ -150,11 +150,7 @@ export default function DashboardPage() {
           </AuthGuard>
           
           <AuthGuard allowedRoles={customerManagementRoles} redirectPath='/login'>
-            <Card className={`shadow-lg hover:shadow-xl transition-shadow ${
-              isUserManagementCardVisible 
-                ? 'sm:col-span-2 lg:col-span-2 xl:col-span-2' // Original span if User Management is visible
-                : 'sm:col-span-2 lg:col-span-4 xl:col-span-4' // Span full width on lg/xl if User Management is hidden
-            }`}>
+            <Card className="shadow-lg hover:shadow-xl transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xl sm:text-2xl font-semibold">Manage Customers</CardTitle>
                 <Users className="h-7 w-7 sm:h-8 sm:w-8 text-accent" />
@@ -174,7 +170,7 @@ export default function DashboardPage() {
 
           {isUserManagementCardVisible && (
             <AuthGuard allowedRoles={userManagementRoles} redirectPath='/login'>
-              <Card className="shadow-lg hover:shadow-xl transition-shadow sm:col-span-2 lg:col-span-2 xl:col-span-2"> 
+              <Card className="shadow-lg hover:shadow-xl transition-shadow"> 
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-xl sm:text-2xl font-semibold">User Management</CardTitle>
                   <UserCog className="h-7 w-7 sm:h-8 sm:w-8 text-accent" />
