@@ -72,8 +72,8 @@ export default function BulkUploadPage() {
     <AuthGuard allowedRoles={allowedRoles}>
       <div className="space-y-6">
         <Button variant="outline" size="sm" asChild>
-            <Link href="/settings">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Settings
+            <Link href="/products">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Products
             </Link>
         </Button>
         <div>

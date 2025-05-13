@@ -47,8 +47,8 @@ export default function ExportOrdersPage() {
     <AuthGuard allowedRoles={allowedRoles}>
       <div className="space-y-6">
         <Button variant="outline" size="sm" asChild>
-            <Link href="/settings">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Settings
+            <Link href="/orders">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Orders
             </Link>
         </Button>
         <div>
