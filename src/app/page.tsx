@@ -1,30 +1,29 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Boxes, Receipt, ArrowRight, Users, History, BarChart3, PieChart, Tags, SettingsIcon } from 'lucide-react'; 
+import { Boxes, Receipt, ArrowRight, Users, History, BarChart3, PieChart, Tags, SettingsIcon, UserCog } from 'lucide-react'; 
 import { Suspense } from 'react';
 import OrdersChart from '@/components/dashboard/OrdersChart';
 import StockOverviewChart from '@/components/dashboard/StockOverviewChart';
 import { Skeleton } from '@/components/ui/skeleton';
-import AuthGuard from '@/components/auth/AuthGuard'; // Import AuthGuard
+import AuthGuard from '@/components/auth/AuthGuard'; 
 import type { UserRole } from '@/types';
 
 function ChartSkeleton() {
   return <Skeleton className="h-[300px] w-full rounded-lg" />;
 }
 
-// Define roles that can access specific cards
-const productManagementRoles: UserRole[] = ['owner', 'employee'];
-const billingRoles: UserRole[] = ['owner', 'employee'];
-const categoryManagementRoles: UserRole[] = ['owner', 'employee'];
-const orderHistoryRoles: UserRole[] = ['owner', 'employee'];
-const customerManagementRoles: UserRole[] = ['owner', 'employee'];
-const settingsRoles: UserRole[] = ['owner'];
+const productManagementRoles: UserRole[] = ['owner', 'admin', 'employee'];
+const billingRoles: UserRole[] = ['owner', 'admin', 'employee'];
+const categoryManagementRoles: UserRole[] = ['owner', 'admin', 'employee'];
+const orderHistoryRoles: UserRole[] = ['owner', 'admin', 'employee'];
+const customerManagementRoles: UserRole[] = ['owner', 'admin', 'employee'];
+const settingsRoles: UserRole[] = ['owner', 'admin']; // Admins can now access settings
 
 
 export default function DashboardPage() {
   return (
-    <AuthGuard> {/* Wrap content with AuthGuard */}
+    <AuthGuard> 
       <div className="space-y-6 md:space-y-8">
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
           <Card className="shadow-lg">
@@ -56,7 +55,7 @@ export default function DashboardPage() {
         </section>
 
         <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          <AuthGuard allowedRoles={productManagementRoles}>
+          <AuthGuard allowedRoles={productManagementRoles} redirectPath='/login'>
             <Card className="shadow-lg hover:shadow-xl transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xl sm:text-2xl font-semibold">Manage Products</CardTitle>
@@ -75,7 +74,7 @@ export default function DashboardPage() {
             </Card>
           </AuthGuard>
 
-          <AuthGuard allowedRoles={billingRoles}>
+          <AuthGuard allowedRoles={billingRoles} redirectPath='/login'>
             <Card className="shadow-lg hover:shadow-xl transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xl sm:text-2xl font-semibold">Create Bill</CardTitle>
@@ -94,7 +93,7 @@ export default function DashboardPage() {
             </Card>
           </AuthGuard>
           
-          <AuthGuard allowedRoles={categoryManagementRoles}>
+          <AuthGuard allowedRoles={categoryManagementRoles} redirectPath='/login'>
             <Card className="shadow-lg hover:shadow-xl transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xl sm:text-2xl font-semibold">Categories</CardTitle>
@@ -113,7 +112,7 @@ export default function DashboardPage() {
             </Card>
           </AuthGuard>
 
-          <AuthGuard allowedRoles={orderHistoryRoles}>
+          <AuthGuard allowedRoles={orderHistoryRoles} redirectPath='/login'>
             <Card className="shadow-lg hover:shadow-xl transition-shadow">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xl sm:text-2xl font-semibold">Order History</CardTitle>
@@ -132,8 +131,8 @@ export default function DashboardPage() {
             </Card>
           </AuthGuard>
           
-          <AuthGuard allowedRoles={customerManagementRoles}>
-            <Card className="shadow-lg hover:shadow-xl transition-shadow sm:col-span-2 lg:col-span-2 xl:col-span-2"> {/* Adjusted span for 4-col layout */}
+          <AuthGuard allowedRoles={customerManagementRoles} redirectPath='/login'>
+            <Card className="shadow-lg hover:shadow-xl transition-shadow sm:col-span-2 lg:col-span-2 xl:col-span-2">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xl sm:text-2xl font-semibold">Manage Customers</CardTitle>
                 <Users className="h-7 w-7 sm:h-8 sm:w-8 text-accent" />
@@ -151,15 +150,15 @@ export default function DashboardPage() {
             </Card>
           </AuthGuard>
 
-          <AuthGuard allowedRoles={settingsRoles}>
-            <Card className="shadow-lg hover:shadow-xl transition-shadow sm:col-span-2 lg:col-span-2 xl:col-span-2"> {/* Adjusted span */}
+          <AuthGuard allowedRoles={settingsRoles} redirectPath='/login'>
+            <Card className="shadow-lg hover:shadow-xl transition-shadow sm:col-span-2 lg:col-span-2 xl:col-span-2"> 
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xl sm:text-2xl font-semibold">Settings</CardTitle>
                 <SettingsIcon className="h-7 w-7 sm:h-8 sm:w-8 text-accent" />
               </CardHeader>
               <CardContent>
                 <CardDescription className="mb-3 sm:mb-4 text-sm sm:text-base">
-                  Manage application settings, bulk uploads, and exports.
+                  Manage application settings, users, bulk uploads, and exports.
                 </CardDescription>
                 <Button asChild variant="default" className="w-full sm:w-auto bg-primary hover:bg-primary/90">
                   <Link href="/settings">

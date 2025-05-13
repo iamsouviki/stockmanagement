@@ -77,13 +77,14 @@ export interface StoreDetails {
 
 export const WALK_IN_CUSTOMER_ID = "WALK_IN_CUSTOMER";
 
-// New User types for Authentication and Roles
-export type UserRole = 'owner' | 'employee';
+// Updated User types for Authentication and Roles
+export type UserRole = 'owner' | 'admin' | 'employee';
 
 export interface UserProfile {
-  id: string; // Firebase Auth UID
+  id: string; // Firebase Auth UID (which is user.uid)
   email: string | null;
   displayName: string | null;
+  mobileNumber?: string | null; // Added mobile number
   role: UserRole;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
