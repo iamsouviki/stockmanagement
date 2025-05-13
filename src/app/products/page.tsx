@@ -17,7 +17,7 @@ import AuthGuard from "@/components/auth/AuthGuard";
 import { useAuth } from "@/hooks/useAuth"; // Import useAuth
 
 const pageAccessRoles: UserRole[] = ['owner', 'admin', 'employee'];
-const bulkUploadRoles: UserRole[] = ['owner'];
+const bulkUploadRoles: UserRole[] = ['owner', 'admin', 'employee']; // Updated roles
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
