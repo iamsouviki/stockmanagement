@@ -10,13 +10,12 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Copy, Printer } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore'; // Firebase Timestamp
 import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
 import Logo from '@/components/icons/Logo';
-// import jsPDF from 'jspdf'; // No longer directly used here
 import { storeDetails } from '@/config/storeDetails';
-import { generateInvoicePdf } from '@/lib/pdfGenerator'; // Import the new PDF utility
+import { generateInvoicePdf } from '@/lib/pdfGenerator'; 
 
 export default function OrderDetailPage() {
   const params = useParams();
@@ -49,17 +48,56 @@ export default function OrderDetailPage() {
     }
   }, [orderId, toast, router]);
 
-  const formatDate = (dateValue: Timestamp | string | Date | undefined) => {
+  const formatDate = (dateValue: Timestamp | string | Date | undefined | null) => {
     if (!dateValue) return 'N/A';
-    if (dateValue instanceof Timestamp) {
-      return format(dateValue.toDate(), 'PPpp');
+
+    if (dateValue instanceof Timestamp) { // Check for Firebase Timestamp
+      try {
+        return format(dateValue.toDate(), 'PPpp');
+      } catch (e) {
+        console.error("Error formatting Firestore Timestamp in OrderDetailPage:", e, dateValue);
+        return 'Invalid Date';
+      }
     }
-    if (typeof dateValue === 'string') {
-      return format(new Date(dateValue), 'PPpp');
-    }
+    
     if (dateValue instanceof Date) {
-      return format(dateValue, 'PPpp');
+      try {
+        if (isNaN(dateValue.getTime())) {
+             console.warn("Invalid Date object in OrderDetailPage:", dateValue);
+             return 'Invalid Date';
+        }
+        return format(dateValue, 'PPpp');
+      } catch (e) {
+        console.error("Error formatting Date object in OrderDetailPage:", e, dateValue);
+        return 'Invalid Date';
+      }
     }
+
+    if (typeof dateValue === 'string') {
+      try {
+        const parsedDate = new Date(dateValue);
+        if (isNaN(parsedDate.getTime())) {
+          console.warn("Invalid date string in OrderDetailPage:", dateValue);
+          return 'Invalid Date';
+        }
+        return format(parsedDate, 'PPpp');
+      } catch (e) {
+        console.error("Error formatting date string in OrderDetailPage:", e, dateValue);
+        return 'Invalid Date';
+      }
+    }
+    
+    // Fallback for plain objects that might have a toDate method
+     if (typeof (dateValue as any)?.toDate === 'function') {
+       try {
+         return format((dateValue as any).toDate(), 'PPpp');
+       } catch (e) {
+          console.error("Error formatting object with toDate() in OrderDetailPage:", e, dateValue);
+          return 'Invalid Date';
+       }
+     }
+
+    console.warn("Unformattable dateValue in OrderDetailPage:", dateValue);
     return 'N/A';
   };
 
@@ -192,4 +230,3 @@ export default function OrderDetailPage() {
     </div>
   );
 }
-

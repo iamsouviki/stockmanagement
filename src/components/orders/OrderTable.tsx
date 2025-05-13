@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Eye, Copy } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore'; // Firebase Timestamp
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
@@ -22,17 +22,57 @@ interface OrderTableProps {
 }
 
 const OrderTable: React.FC<OrderTableProps> = ({ orders }) => {
-  const formatDate = (dateValue: Timestamp | string | Date) => {
-    if (dateValue instanceof Timestamp) {
-      return format(dateValue.toDate(), 'PPpp'); // E.g., Mar 21, 2023, 4:30 PM
+  const formatDate = (dateValue: Timestamp | string | Date | undefined | null) => {
+    if (!dateValue) return 'N/A';
+
+    if (dateValue instanceof Timestamp) { // Check for Firebase Timestamp first
+      try {
+        return format(dateValue.toDate(), 'PPpp');
+      } catch (e) {
+        console.error("Error formatting Firestore Timestamp in OrderTable:", e, dateValue);
+        return 'Invalid Date';
+      }
     }
-    if (typeof dateValue === 'string') {
-      return format(new Date(dateValue), 'PPpp');
-    }
+    
     if (dateValue instanceof Date) {
-      return format(dateValue, 'PPpp');
+      try {
+        if (isNaN(dateValue.getTime())) {
+             console.warn("Invalid Date object in OrderTable:", dateValue);
+             return 'Invalid Date';
+        }
+        return format(dateValue, 'PPpp');
+      } catch (e) {
+        console.error("Error formatting Date object in OrderTable:", e, dateValue);
+        return 'Invalid Date';
+      }
     }
-    return 'N/A';
+
+    if (typeof dateValue === 'string') {
+      try {
+        const parsedDate = new Date(dateValue);
+        if (isNaN(parsedDate.getTime())) {
+          console.warn("Invalid date string in OrderTable:", dateValue);
+          return 'Invalid Date';
+        }
+        return format(parsedDate, 'PPpp');
+      } catch (e) {
+        console.error("Error formatting date string in OrderTable:", e, dateValue);
+        return 'Invalid Date';
+      }
+    }
+    
+    // Fallback for plain objects that might have a toDate method
+    if (typeof (dateValue as any)?.toDate === 'function') {
+       try {
+         return format((dateValue as any).toDate(), 'PPpp');
+       } catch (e) {
+          console.error("Error formatting object with toDate() in OrderTable:", e, dateValue);
+          return 'Invalid Date';
+       }
+     }
+
+    console.warn("Unformattable dateValue in OrderTable:", dateValue);
+    return 'N/A'; 
   };
 
   return (

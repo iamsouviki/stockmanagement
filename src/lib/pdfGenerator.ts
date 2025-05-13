@@ -3,21 +3,39 @@ import jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import type { Order, StoreDetails } from '@/types';
 import { Timestamp } from 'firebase/firestore';
-// import { WALK_IN_CUSTOMER_ID } from '@/types'; // Not directly needed here as order object has resolved names
 
-function formatDateForPdf(dateValue: Timestamp | string | Date | undefined) {
+
+function formatDateForPdf(dateValue: Timestamp | string | Date | undefined | null) {
   if (!dateValue) return 'N/A';
   let dateToFormat: Date;
+
   if (dateValue instanceof Timestamp) {
-    dateToFormat = dateValue.toDate();
-  } else if (typeof dateValue === 'string') {
-    dateToFormat = new Date(dateValue);
+    try {
+      dateToFormat = dateValue.toDate();
+    } catch (e) {
+      console.error("Error converting Firestore Timestamp to Date:", e, dateValue);
+      return 'Invalid Date';
+    }
   } else if (dateValue instanceof Date) {
     dateToFormat = dateValue;
+  } else if (typeof dateValue === 'string') {
+    dateToFormat = new Date(dateValue);
   } else {
+    console.warn("Unknown date type in formatDateForPdf:", dateValue);
     return 'N/A';
   }
-  return format(dateToFormat, 'MMM dd, yyyy HH:mm:ss');
+
+  try {
+    // Check if the resulting date is valid before formatting
+    if (isNaN(dateToFormat.getTime())) {
+      console.warn("Invalid date created in formatDateForPdf:", dateValue, "Resulted in:", dateToFormat);
+      return 'Invalid Date';
+    }
+    return format(dateToFormat, 'MMM dd, yyyy HH:mm:ss');
+  } catch (e) {
+    console.error("Error formatting date in formatDateForPdf:", e, dateToFormat);
+    return 'Error Date';
+  }
 }
 
 
@@ -72,14 +90,13 @@ export function generateInvoicePdf(
   doc.text(`Customer: ${order.customerName}`, margin, yPos);
   const customerMobileText = `Mobile: ${order.customerMobile}`;
   
-  // Attempt to place mobile next to name if space allows
   const customerNameWidth = doc.getTextWidth(`Customer: ${order.customerName}`);
   const mobileTextWidth = doc.getTextWidth(customerMobileText);
-  const availableSpaceForMobile = pageWidth - (margin * 2) - customerNameWidth - 5; // 5 for padding
+  const availableSpaceForMobile = pageWidth - (margin * 2) - customerNameWidth - 5; 
 
   if (mobileTextWidth < availableSpaceForMobile) {
     doc.text(customerMobileText, margin + customerNameWidth + 5, yPos);
-  } else { // If not enough space, put mobile on new line
+  } else { 
     yPos += 6;
     doc.text(customerMobileText, margin, yPos);
   }
@@ -90,12 +107,12 @@ export function generateInvoicePdf(
   if (order.customerAddress) {
     const addressLines = doc.splitTextToSize(`Address: ${order.customerAddress}`, pageWidth - (margin * 2));
     doc.text(addressLines, margin, yPos);
-    yPos += (addressLines.length * (doc.getLineHeight('helvetica', 'normal', 10) / doc.internal.scaleFactor)) + 2; // +2 for padding
+    yPos += (addressLines.length * (doc.getLineHeight('helvetica', 'normal', 10) / doc.internal.scaleFactor)) + 2; 
   } else {
     doc.text(`Address: N/A`, margin, yPos);
     yPos += 6;
   }
-  yPos += 2; // Extra space before table
+  yPos += 2; 
 
   // Column definitions
   const paddingBetweenCols = 5;
@@ -110,10 +127,11 @@ export function generateInvoicePdf(
     snBarcode: margin + productColWidth + paddingBetweenCols,
     qty: margin + productColWidth + paddingBetweenCols + snBarcodeColWidth + paddingBetweenCols,
     price: margin + productColWidth + paddingBetweenCols + snBarcodeColWidth + paddingBetweenCols + qtyColWidth + paddingBetweenCols,
-    subtotal: pageWidth - margin // Subtotal will be right aligned to page margin
+    subtotal: pageWidth - margin 
   };
   
   const drawTableHeaders = () => {
+    yPos += 2; // Add some space before headers
     doc.setLineWidth(0.2);
     doc.line(margin, yPos, pageWidth - margin, yPos); 
     yPos += 5; 
@@ -131,17 +149,17 @@ export function generateInvoicePdf(
     yPos += 2; 
     doc.line(margin, yPos, pageWidth - margin, yPos); 
     yPos += 4; 
-    doc.setFont('helvetica', 'normal'); // Reset font for items
+    doc.setFont('helvetica', 'normal'); 
   };
 
   drawTableHeaders();
 
   // Table Items
   order.items.forEach((item) => {
-    if (yPos > pageHeight - 45) { // Check for page break
+    if (yPos > pageHeight - 45) { 
       doc.addPage();
       yPos = margin;
-      drawTableHeaders(); // Redraw headers on new page
+      drawTableHeaders(); 
     }
     const itemSubtotal = item.price * item.billQuantity;
 
@@ -192,4 +210,3 @@ export function generateInvoicePdf(
   doc.autoPrint({variant: 'non-conform'});
   doc.output('dataurlnewwindow', { filename: `StockPilot-Bill-${order.orderNumber}.pdf` });
 }
-
