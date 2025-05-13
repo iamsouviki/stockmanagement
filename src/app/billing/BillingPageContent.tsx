@@ -1,3 +1,4 @@
+
 // src/app/billing/BillingPageContent.tsx
 "use client";
 
@@ -19,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import BillingPageLoadingSkeleton from './BillingPageLoadingSkeleton';
+import BillingPageLoadingSkeleton from '@/components/billing/BillingPageLoadingSkeleton';
 import { generateInvoicePdf } from '@/lib/pdfGenerator'; 
 
 export default function BillingPageContent() {
@@ -315,17 +316,7 @@ export default function BillingPageContent() {
 
   const handleFinalizeBill = async () => {
     setIsFinalizing(true);
-    // These logs are crucial for debugging the edit vs. create path
-    console.log("--- handleFinalizeBill START ---");
-    console.log("Current Intent:", intent);
-    console.log("Current From Order ID:", fromOrderId);
-    console.log("Original Order For Edit (is set?):", !!originalOrderForEdit);
-    if (originalOrderForEdit) {
-        console.log("Original Order ID for Edit:", originalOrderForEdit.id);
-    }
-    console.log("---------------------------------");
-
-
+    
     if (billItems.length === 0) {
       toast({
         title: "Empty Bill",
@@ -363,7 +354,6 @@ export default function BillingPageContent() {
       customerMobile = selectedCustomer.mobileNumber;
       customerAddress = selectedCustomer.address || null;
     } else if (intent === 'edit' && originalOrderForEdit && originalOrderForEdit.customerName !== "Walk-in Customer") {
-      // If editing an order that had a specific customer, retain that customer's details if no new customer is selected.
       customerId = originalOrderForEdit.customerId;
       customerName = originalOrderForEdit.customerName;
       customerMobile = originalOrderForEdit.customerMobile;
@@ -384,42 +374,29 @@ export default function BillingPageContent() {
 
     try {
       let orderIdForResult: string;
-      let orderNumberForToast: string | undefined;
+      let orderNumberForResult: string | undefined;
 
-      if (intent === 'edit') {
-        if (!fromOrderId || !originalOrderForEdit) {
-          console.error("CRITICAL: Edit intent, but fromOrderId or originalOrderForEdit is missing at the point of service call.", { fromOrderIdPresent: !!fromOrderId, originalOrderForEditPresent: !!originalOrderForEdit });
-          toast({
-            title: "Edit Error",
-            description: "Cannot update order. Original order data is missing or invalid. Please reload and try again.",
-            variant: "destructive",
-            duration: 7000,
-          });
-          setIsFinalizing(false);
-          return;
-        }
-        console.log("Calling updateOrderAndAdjustStock with fromOrderId:", fromOrderId);
+      if (intent === 'edit' && fromOrderId && originalOrderForEdit) {
         orderIdForResult = await updateOrderAndAdjustStock(fromOrderId, orderPayload, originalOrderForEdit);
-        orderNumberForToast = originalOrderForEdit.orderNumber; 
+        orderNumberForResult = originalOrderForEdit.orderNumber; 
          toast({
           title: "Order Updated!",
-          description: `Order ${orderNumberForToast || orderIdForResult} has been successfully updated. PDF is opening for print.`,
+          description: `Order ${orderNumberForResult || orderIdForResult} has been successfully updated. PDF is opening for print.`,
           className: "bg-green-500 text-white",
           duration: 7000,
         });
       } else { 
-        console.log("Calling addOrderAndDecrementStock (new order)");
         const itemsToDecrementStock = billItems.map(item => ({
           productId: item.id,
           quantity: item.billQuantity,
         }));
         orderIdForResult = await addOrderAndDecrementStock(orderPayload, itemsToDecrementStock);
-        const newlyCreatedOrder = await getOrderById(orderIdForResult);
-        orderNumberForToast = newlyCreatedOrder?.orderNumber;
+        const tempNewOrder = await getOrderById(orderIdForResult); 
+        orderNumberForResult = tempNewOrder?.orderNumber;
 
         toast({
           title: "Bill Finalized!",
-          description: `Order ${orderNumberForToast || orderIdForResult} saved. PDF is opening for print.`,
+          description: `Order ${orderNumberForResult || orderIdForResult} saved. PDF is opening for print.`,
           className: "bg-green-500 text-white",
           duration: 7000,
         });
