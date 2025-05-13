@@ -3,4 +3,4 @@
 // For simplicity and to avoid circular dependencies with AuthContext itself.
 // If useAuth needs to grow or have more logic, it can be expanded here.
 
-export { useAuth } from '@/contexts/AuthContext';
+export { useAuthContext as useAuth } from '@/contexts/AuthContext'; // Updated export

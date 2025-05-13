@@ -1,13 +1,15 @@
+// src/contexts/AuthContext.tsx
 'use client';
 
 import type { User as FirebaseUser } from 'firebase/auth';
 import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { auth } from '@/lib/firebase';
-import type { UserProfile } from '@/types';
-import { getUserProfile } from '@/services/userService';
-import { useRouter, usePathname } from 'next/navigation';
-import { useToast } from '@/hooks/use-toast'; // Ensure toast is imported if used
+import { auth, db } from '@/lib/firebase'; // Import db
+import type { UserProfile, UserRole } from '@/types';
+import { getUserProfile, createFirestoreUserProfile } from '@/services/userService'; // Import createFirestoreUserProfile
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore'; // Import Firestore functions
 
 interface AuthContextType {
   currentUser: FirebaseUser | null;
@@ -21,61 +23,84 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Start true
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
-  const pathname = usePathname();
   const { toast } = useToast();
 
   useEffect(() => {
-    // console.log("AuthProvider: Mounting. Initial isLoading:", isLoading);
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      // console.log("AuthProvider: onAuthStateChanged triggered. User:", user ? user.uid : null);
-      setIsLoading(true); // Ensure loading is true while processing auth state
+      setIsLoading(true);
       if (user) {
         setCurrentUser(user);
         try {
-          // console.log("AuthProvider: Fetching profile for UID:", user.uid);
-          const profile = await getUserProfile(user.uid);
-          // console.log("AuthProvider: Profile fetched:", profile ? { id: profile.id, role: profile.role } : null);
+          let profile = await getUserProfile(user.uid);
+
+          if (!profile) {
+            // No profile exists, determine role and create one
+            const usersCollectionRef = collection(db, 'users');
+            const ownerQuery = query(usersCollectionRef, where('role', '==', 'owner'), limit(1));
+            const ownerSnapshot = await getDocs(ownerQuery);
+
+            let newRole: UserRole = 'employee';
+            if (ownerSnapshot.empty) {
+              newRole = 'owner';
+              toast({
+                title: "Welcome, Owner!",
+                description: "You are the first user and have been assigned the Owner role.",
+                duration: 7000,
+              });
+            } else {
+              newRole = 'employee';
+               toast({
+                title: "Account Initialized",
+                description: "Your user profile has been created with the Employee role.",
+                duration: 5000,
+              });
+            }
+            
+            // Use available info from FirebaseUser. displayName and phoneNumber might be null.
+            await createFirestoreUserProfile(
+              user.uid,
+              user.email,
+              user.displayName,
+              newRole,
+              user.phoneNumber // This is often null unless explicitly set or from certain auth providers
+            );
+            profile = await getUserProfile(user.uid); // Fetch the newly created profile
+          }
           setUserProfile(profile);
           if (!profile) {
-            // console.warn("AuthProvider: User profile is null for authenticated user:", user.uid);
+            console.warn("AuthProvider: User profile is null for authenticated user after attempted creation:", user.uid);
           }
+
         } catch (error) {
-          console.error("AuthProvider: Error fetching user profile:", error);
-          setUserProfile(null); 
+          console.error("AuthProvider: Error during profile processing:", error);
+          setUserProfile(null);
         }
       } else {
-        // console.log("AuthProvider: No authenticated user.");
         setCurrentUser(null);
         setUserProfile(null);
       }
-      setIsLoading(false); 
-      // console.log("AuthProvider: Finished processing auth state. isLoading:", false, "currentUser:", user ? user.uid : 'null', "userProfile:", userProfile ? userProfile.role : 'null');
+      setIsLoading(false);
     });
 
     return () => {
-      // console.log("AuthProvider: Unmounting. Unsubscribing from onAuthStateChanged.");
       unsubscribe();
-    }
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array: runs once on mount, cleans up on unmount.
+  }, [toast]); // Added toast to dependency array
 
   const logout = async () => {
-    // console.log("AuthProvider: Logout called.");
-    // setIsLoading(true); // No need, onAuthStateChanged will handle state updates
     try {
       await firebaseSignOut(auth);
-      // currentUser and userProfile will be set to null by onAuthStateChanged
-      // which will also set isLoading appropriately.
-      router.push('/login'); 
+      // Auth state change will be handled by onAuthStateChanged
+      router.push('/login');
     } catch (error) {
       console.error("AuthProvider: Error signing out:", error);
       toast({ title: "Logout Failed", description: "Could not sign out. Please try again.", variant: "destructive" });
-      // setIsLoading(false); // Not needed here
     }
   };
-  
+
   return (
     <AuthContext.Provider value={{ currentUser, userProfile, isLoading, logout }}>
       {children}
@@ -83,10 +108,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const useAuth = (): AuthContextType => {
+export const useAuthContext = (): AuthContextType => { // Renamed to avoid conflict with hook folder
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuthContext must be used within an AuthProvider');
   }
   return context;
 };

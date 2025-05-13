@@ -76,6 +76,21 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({ users, onEdit
     }
   };
 
+  const canEditUser = (userToEdit: UserProfile): boolean => {
+    if (userToEdit.id === currentUserProfile.id) return false; // Cannot edit self
+    if (currentUserProfile.role === 'owner') return true; // Owner can edit anyone (except self's role effectively)
+    if (currentUserProfile.role === 'admin' && userToEdit.role === 'employee') return true; // Admin can edit employee
+    return false;
+  };
+
+  const canDeleteUser = (userToDelete: UserProfile): boolean => {
+    if (userToDelete.id === currentUserProfile.id) return false; // Cannot delete self
+    if (currentUserProfile.role === 'owner' && userToDelete.role !== 'owner') return true; // Owner can delete admin/employee
+    if (currentUserProfile.role === 'admin' && userToDelete.role === 'employee') return true; // Admin can delete employee
+    return false;
+  };
+
+
   return (
     <Card className="shadow-lg">
       <CardHeader>
@@ -109,7 +124,10 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({ users, onEdit
                     <TableCell className="text-xs sm:text-sm px-2 sm:px-4 whitespace-normal break-words">{user.email || 'N/A'}</TableCell>
                     <TableCell className="text-xs sm:text-sm px-2 sm:px-4">{user.mobileNumber || '-'}</TableCell>
                     <TableCell className="text-xs sm:text-sm px-2 sm:px-4">
-                      <Badge variant={user.role === 'owner' ? 'default' : user.role === 'admin' ? 'destructive' : 'secondary'} className="capitalize flex items-center gap-1 w-fit text-xs">
+                      <Badge 
+                        variant={user.role === 'owner' ? 'default' : user.role === 'admin' ? 'destructive' : 'secondary'} 
+                        className={`capitalize flex items-center gap-1 w-fit text-xs ${user.role === 'owner' ? 'bg-amber-500 hover:bg-amber-600' : user.role === 'admin' ? 'bg-blue-500 hover:bg-blue-600' : 'bg-green-500 hover:bg-green-600'} text-white`}
+                      >
                         <RoleIcon role={user.role} />
                         {user.role}
                       </Badge>
@@ -117,12 +135,12 @@ const UserManagementTable: React.FC<UserManagementTableProps> = ({ users, onEdit
                     <TableCell className="text-xs sm:text-sm px-2 sm:px-4">{formatDate(user.createdAt)}</TableCell>
                     <TableCell className="text-center px-2 sm:px-4">
                       <div className="flex justify-center space-x-1 sm:space-x-2">
-                        {(currentUserProfile.role === 'owner' || (currentUserProfile.role === 'admin' && user.role !== 'owner')) && user.id !== currentUserProfile.id && (
+                        {canEditUser(user) && (
                           <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => onEdit(user)} title="Edit User">
                             <Pencil className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
                           </Button>
                         )}
-                        {currentUserProfile.role === 'owner' && user.id !== currentUserProfile.id && (
+                        {canDeleteUser(user) && (
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8" title="Delete User">

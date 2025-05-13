@@ -15,11 +15,11 @@ import {
   updateUserProfile,
   deleteUserAccountAndProfile,
 } from "@/services/userService";
-import { auth } from "@/lib/firebase"; // Import Firebase auth
+import { auth } from "@/lib/firebase"; 
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import AuthGuard from "@/components/auth/AuthGuard";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth"; // Updated import
 import Link from "next/link";
 
 const allowedAccessRoles: UserRole[] = ['owner', 'admin'];
@@ -30,7 +30,7 @@ export default function UserManagementPage() {
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
-  const { userProfile: currentUserProfile } = useAuth(); // Current logged-in user's profile
+  const { userProfile: currentUserProfile } = useAuth(); 
 
   const fetchUsers = async () => {
     setIsLoading(true);
@@ -46,6 +46,7 @@ export default function UserManagementPage() {
 
   useEffect(() => {
     fetchUsers();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toast]);
 
   const handleAddUser = () => {
@@ -54,6 +55,10 @@ export default function UserManagementPage() {
   };
 
   const handleEditUser = (user: UserProfile) => {
+    if (user.id === currentUserProfile?.id) {
+        toast({ title: "Action Not Allowed", description: "You cannot edit your own account details here.", variant: "destructive" });
+        return;
+    }
     if (currentUserProfile?.role === 'admin' && user.role === 'owner') {
         toast({ title: "Permission Denied", description: "Admins cannot edit owner accounts.", variant: "destructive" });
         return;
@@ -67,45 +72,59 @@ export default function UserManagementPage() {
       toast({ title: "Action Not Allowed", description: "You cannot delete your own account.", variant: "destructive" });
       return;
     }
-     if (currentUserProfile?.role === 'admin' && userRoleToDelete === 'owner') {
-        toast({ title: "Permission Denied", description: "Admins cannot delete owner accounts.", variant: "destructive" });
+     if (userRoleToDelete === 'owner') { // Only owner can delete owner, but not themselves
+        if(currentUserProfile?.role !== 'owner') {
+            toast({ title: "Permission Denied", description: "Only owners can attempt to delete owner accounts.", variant: "destructive" });
+            return;
+        }
+        // Further logic might be needed if multiple owners are possible to prevent last owner deletion.
+        // For now, an owner cannot delete another owner via this UI for safety unless explicitly designed.
+        // Let's prevent deleting other owners for now via this UI.
+        // Consider a dedicated "transfer ownership" or "demote owner" feature.
+        toast({ title: "Action Not Allowed", description: "Deleting owner accounts is a restricted operation.", variant: "destructive" });
         return;
     }
-    if (currentUserProfile?.role !== 'owner') {
-        toast({ title: "Permission Denied", description: "Only owners can delete user accounts.", variant: "destructive" });
+    if (currentUserProfile?.role === 'admin' && userRoleToDelete === 'admin') {
+        toast({ title: "Permission Denied", description: "Admins cannot delete other admin accounts.", variant: "destructive" });
         return;
     }
 
-
-    try {
-      // Note: deleteUserAccountAndProfile currently only deletes Firestore profile.
-      // True Auth account deletion needs Admin SDK (e.g., via Cloud Function).
-      await deleteUserAccountAndProfile(userIdToDelete);
-      setUsers(users.filter((u) => u.id !== userIdToDelete));
-      toast({
-        title: "User Profile Deleted",
-        description: "The user's profile has been removed. Auth account may still exist.",
-        variant: "destructive",
-      });
-    } catch (error) {
-      console.error("Error deleting user:", error);
-      toast({ title: "Error", description: "Failed to delete user profile.", variant: "destructive" });
+    // Owner can delete admin/employee. Admin can delete employee.
+    if (currentUserProfile?.role === 'owner' || (currentUserProfile?.role === 'admin' && userRoleToDelete === 'employee')) {
+        try {
+          await deleteUserAccountAndProfile(userIdToDelete);
+          setUsers(users.filter((u) => u.id !== userIdToDelete));
+          toast({
+            title: "User Profile Deleted",
+            description: "The user's profile has been removed. Auth account may still exist.",
+            variant: "destructive",
+          });
+        } catch (error) {
+          console.error("Error deleting user:", error);
+          toast({ title: "Error", description: "Failed to delete user profile.", variant: "destructive" });
+        }
+    } else {
+         toast({ title: "Permission Denied", description: "You do not have permission to delete this user.", variant: "destructive" });
     }
   };
 
   const handleSubmitUser = async (data: UserManagementFormData) => {
     try {
       if (editingUser) { // Editing existing user
-        if (currentUserProfile?.role === 'admin' && editingUser.role === 'owner' && data.role !== 'owner') {
-             toast({ title: "Permission Denied", description: "Admins cannot change an owner's role.", variant: "destructive" });
+        if (editingUser.id === currentUserProfile?.id) {
+             toast({ title: "Action Not Allowed", description: "You cannot change your own role.", variant: "destructive"});
              return;
         }
-        if (currentUserProfile?.role === 'admin' && editingUser.role === 'admin' && data.role === 'owner') {
+        if (currentUserProfile?.role === 'admin' && editingUser.role === 'owner') {
+             toast({ title: "Permission Denied", description: "Admins cannot modify owner accounts.", variant: "destructive" });
+             return;
+        }
+        if (currentUserProfile?.role === 'admin' && data.role === 'owner') { // Admin trying to promote to owner
             toast({ title: "Permission Denied", description: "Admins cannot promote users to owner.", variant: "destructive" });
             return;
         }
-        if (editingUser.id === currentUserProfile?.id && data.role !== currentUserProfile.role) {
-            toast({ title: "Action Not Allowed", description: "You cannot change your own role.", variant: "destructive"});
+         if (currentUserProfile?.role === 'admin' && editingUser.role === 'admin' && data.role !== 'admin') { // Admin trying to demote another admin
+            toast({ title: "Permission Denied", description: "Admins cannot change the role of other admins.", variant: "destructive" });
             return;
         }
 
@@ -115,8 +134,7 @@ export default function UserManagementPage() {
           role: data.role,
           mobileNumber: data.mobileNumber,
         });
-        // Refetch users to get the latest data including timestamps
-        await fetchUsers();
+        await fetchUsers(); // Refetch to update table
         toast({
           title: "User Updated",
           description: `User "${data.displayName}" has been successfully updated.`,
@@ -126,25 +144,29 @@ export default function UserManagementPage() {
           toast({ title: "Missing Fields", description: "Email and password are required for new users.", variant: "destructive" });
           return;
         }
-        if (currentUserProfile?.role === 'admin' && data.role === 'owner') {
-            toast({ title: "Permission Denied", description: "Admins cannot create owner accounts.", variant: "destructive" });
+        // Role assignment rules for new users
+        if (currentUserProfile?.role === 'admin' && (data.role === 'owner' || data.role === 'admin')) {
+            toast({ title: "Permission Denied", description: "Admins can only create Employee accounts.", variant: "destructive" });
+            return;
+        }
+        // Owner can create admin or employee. For simplicity, owner cannot create another owner via this dialog.
+        if (currentUserProfile?.role === 'owner' && data.role === 'owner') {
+            toast({ title: "Action Not Recommended", description: "Creating another owner is a sensitive operation. Please create as Admin or Employee first.", variant: "destructive" });
             return;
         }
 
-        // Step 1: Create Firebase Auth user
+
         const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
         const newAuthUser = userCredential.user;
 
-        // Step 2: Create Firestore user profile
         await createFirestoreUserProfile(
           newAuthUser.uid,
-          data.email,
+          data.email, // email from form
           data.displayName,
           data.role,
           data.mobileNumber
         );
-        // Refetch users to include the new user
-        await fetchUsers();
+        await fetchUsers(); // Refetch to include the new user
         toast({
           title: "User Added",
           description: `User "${data.displayName}" has been successfully added.`,
@@ -164,8 +186,18 @@ export default function UserManagementPage() {
     }
   };
 
-  if (!currentUserProfile) {
-    return <Skeleton className="h-60 w-full" />; // Or some other loading/auth check indicator
+  if (!currentUserProfile || isLoading) { // Added isLoading check
+    return (
+        <div className="space-y-6">
+            <Skeleton className="h-8 w-32" />
+            <div className="flex justify-between items-center">
+                <Skeleton className="h-12 w-1/2" />
+                <Skeleton className="h-10 w-36" />
+            </div>
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-64 w-full" />
+        </div>
+    );
   }
 
   return (
@@ -185,32 +217,21 @@ export default function UserManagementPage() {
               Manage application users, their roles, and permissions.
             </p>
           </div>
-          {currentUserProfile.role === 'owner' && ( // Only owner can add new users initially from this UI
+          {/* Owner can add any user (admin/employee). Admin can add employee. */}
+          {(currentUserProfile.role === 'owner' || currentUserProfile.role === 'admin') && (
             <Button onClick={handleAddUser} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
-              <PlusCircle className="mr-2 h-5 w-5" /> Add New User
-            </Button>
-          )}
-           {(currentUserProfile.role === 'admin') && ( // Admin can add 'employee'
-            <Button onClick={handleAddUser} className="bg-primary hover:bg-primary/90 w-full sm:w-auto">
-              <PlusCircle className="mr-2 h-5 w-5" /> Add New Employee
+              <PlusCircle className="mr-2 h-5 w-5" /> 
+              {currentUserProfile.role === 'owner' ? "Add New User" : "Add New Employee"}
             </Button>
           )}
         </div>
 
-        {isLoading ? (
-          <div className="space-y-4">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-          </div>
-        ) : (
-          <UserManagementTable
+        <UserManagementTable
             users={users}
             onEdit={handleEditUser}
             onDelete={handleDeleteUser}
             currentUserProfile={currentUserProfile}
-          />
-        )}
+        />
 
         <UserManagementDialog
           isOpen={isDialogOpen}
