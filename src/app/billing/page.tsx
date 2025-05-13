@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react'; // Added Suspense
 import { useSearchParams, useRouter } from 'next/navigation';
 import BarcodeEntry from '@/components/billing/BarcodeEntry';
 import BillItemsList from '@/components/billing/BillItemsList';
@@ -19,7 +20,26 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export default function BillingPage() {
+// Define a skeleton component for the Suspense fallback
+function BillingPageLoadingSkeleton() {
+  return (
+    <div className="space-y-8">
+      <Skeleton className="h-10 w-1/2" />
+      <Skeleton className="h-8 w-1/3" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-6">
+              <Skeleton className="h-40 w-full" />
+              <Skeleton className="h-60 w-full" />
+          </div>
+          <div className="lg:col-span-1">
+              <Skeleton className="h-48 w-full" />
+          </div>
+      </div>
+    </div>
+  );
+}
+
+function BillingPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromOrderId = searchParams.get('fromOrder');
@@ -51,7 +71,7 @@ export default function BillingPage() {
   }, [fetchProductData]);
 
   useEffect(() => {
-    if (fromOrderId) {
+    if (fromOrderId && availableProducts.length > 0) { 
       const loadOrderForRebill = async () => {
         try {
           const order = await getOrderById(fromOrderId);
@@ -59,11 +79,10 @@ export default function BillingPage() {
             const itemsForBill: BillItem[] = order.items.map(item => {
               const productDetails = availableProducts.find(p => p.id === item.productId);
               return {
-                ...item, // Contains name, price, productId, billQuantity, imageUrl, imageHint
-                id: item.productId, // BillItem expects 'id' to be product id
-                quantity: productDetails?.quantity ?? 0, // Current stock for validation
-                categoryId: productDetails?.categoryId ?? '', // Needed by BillItem if it relies on full Product type
-                // Ensure all required fields for BillItem are present
+                ...item, 
+                id: item.productId, 
+                quantity: productDetails?.quantity ?? 0, 
+                categoryId: productDetails?.categoryId ?? '',
                 serialNumber: item.serialNumber || productDetails?.serialNumber || '',
                 barcode: item.barcode || productDetails?.barcode || '',
               };
@@ -73,7 +92,6 @@ export default function BillingPage() {
               const customer = await getCustomerById(order.customerId);
               setSelectedCustomer(customer);
             } else if (order.customerMobile) {
-              // If only mobile was stored, pre-fill search
               setCustomerSearchTerm(order.customerMobile);
             }
             toast({ title: "Order Loaded", description: `Items from order ${order.orderNumber} loaded for re-billing.` });
@@ -85,11 +103,9 @@ export default function BillingPage() {
           toast({ title: "Error", description: "Failed to load order for re-billing.", variant: "destructive" });
         }
       };
-      if (availableProducts.length > 0) { // Ensure products are loaded before trying to map order items
-         loadOrderForRebill();
-      }
+      loadOrderForRebill();
     }
-  }, [fromOrderId, toast, availableProducts]);
+  }, [fromOrderId, toast, availableProducts, router]);
 
 
   const handleProductAdd = (barcodeOrSn: string) => {
@@ -146,7 +162,7 @@ export default function BillingPage() {
     const productInStock = availableProducts.find(p => p.id === itemId);
     if (!productInStock) return;
 
-    if (newQuantity <= 0) { // Ensure quantity is at least 1
+    if (newQuantity <= 0) { 
         handleRemoveItem(itemId);
         return;
     }
@@ -193,7 +209,7 @@ export default function BillingPage() {
   const handleSelectCustomer = (customer: Customer) => {
     setSelectedCustomer(customer);
     setFoundCustomers([]);
-    setCustomerSearchTerm(customer.mobileNumber); // Optionally clear or set to name
+    setCustomerSearchTerm(customer.mobileNumber); 
   };
 
   const handleClearCustomer = () => {
@@ -208,18 +224,7 @@ export default function BillingPage() {
     const pageWidth = doc.internal.pageSize.width;
     const margin = 15;
     let yPos = margin;
-
-    // Store Logo (optional)
-    if (storeDetails.logoUrl) {
-      try {
-        // Assuming jsPDF supports adding image from URL or you have it as base64
-        // For this example, direct URL usage might be tricky without cors or if jsPDF needs specific format
-        // Placeholder: doc.addImage(storeDetails.logoUrl, 'PNG', margin, yPos, 40, 15);
-        // yPos += 20;
-      } catch (e) { console.error("Error adding logo to PDF:", e); }
-    }
     
-    // Store Name & Type
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
     doc.text(storeDetails.name, pageWidth / 2, yPos, { align: 'center' });
@@ -229,7 +234,6 @@ export default function BillingPage() {
     doc.text(storeDetails.storeType, pageWidth / 2, yPos, { align: 'center' });
     yPos += 10;
 
-    // Store Address & Contact
     doc.setFontSize(9);
     doc.text(storeDetails.address, margin, yPos);
     doc.text(storeDetails.contact, pageWidth - margin, yPos, { align: 'right' });
@@ -237,7 +241,6 @@ export default function BillingPage() {
     doc.text(`GSTIN: ${storeDetails.gstNo}`, margin, yPos);
     yPos += 8;
 
-    // Bill Header
     doc.setLineWidth(0.5);
     doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 8;
@@ -246,11 +249,10 @@ export default function BillingPage() {
     doc.text('INVOICE', pageWidth / 2, yPos, { align: 'center' });
     yPos += 8;
 
-    // Order & Customer Details
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text(`Order No: ${order.orderNumber}`, margin, yPos);
-    const orderDateStr = order.orderDate instanceof Timestamp ? format(order.orderDate.toDate(), 'MMMM dd, yyyy HH:mm:ss') : order.orderDate;
+    const orderDateStr = order.orderDate instanceof Timestamp ? format(order.orderDate.toDate(), 'MMMM dd, yyyy HH:mm:ss') : String(order.orderDate);
     doc.text(`Date: ${orderDateStr}`, pageWidth - margin, yPos, { align: 'right' });
     yPos += 6;
 
@@ -264,7 +266,6 @@ export default function BillingPage() {
     }
     yPos += 10;
 
-    // Table Header
     doc.setLineWidth(0.2);
     doc.line(margin, yPos - 2, pageWidth - margin, yPos - 2);
     doc.setFontSize(10);
@@ -274,29 +275,26 @@ export default function BillingPage() {
     doc.text('SN/Barcode', headX[1], yPos);
     doc.text('Qty', headX[2], yPos, { align: 'right' });
     doc.text('Price', headX[3], yPos, { align: 'right' });
-    doc.text('Subtotal', headX[4], yPos, { align: 'right' });
+    doc.text('Subtotal', headX[4] + 30, yPos, { align: 'right' }); 
     yPos += 5;
     doc.line(margin, yPos -2 , pageWidth - margin, yPos -2);
     yPos += 3;
     
-    // Table Body
     doc.setFont('helvetica', 'normal');
     items.forEach(item => {
       if (yPos > pageHeight - 40) { 
         doc.addPage();
         yPos = margin; 
-        // Could repeat headers here if desired
       }
       const itemSubtotal = item.price * item.billQuantity;
       doc.text(item.name, headX[0], yPos, { maxWidth: headX[1] - headX[0] - 5 });
       doc.text(item.serialNumber || item.barcode, headX[1], yPos, { maxWidth: headX[2] - headX[1] - 5});
       doc.text(item.billQuantity.toString(), headX[2], yPos, { align: 'right' });
       doc.text(`$${item.price.toFixed(2)}`, headX[3], yPos, { align: 'right' });
-      doc.text(`$${itemSubtotal.toFixed(2)}`, headX[4] + 30, yPos, { align: 'right' }); // adjust x for alignment
+      doc.text(`$${itemSubtotal.toFixed(2)}`, headX[4] + 30, yPos, { align: 'right' }); 
       yPos += 6;
     });
 
-    // Summary Section
     yPos += 5;
     const summaryX = pageWidth - margin - 50;
     doc.line(summaryX - 20, yPos, pageWidth - margin, yPos);
@@ -307,7 +305,7 @@ export default function BillingPage() {
     doc.text(`$${order.subtotal.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
     yPos += 6;
 
-    doc.text(`Tax (${(storeDetails.gstNo ? (0.08 * 100) : 0).toFixed(0)}%):`, summaryX, yPos, { align: 'right' }); // Example tax
+    doc.text(`Tax (${(storeDetails.gstNo ? (0.08 * 100) : 0).toFixed(0)}%):`, summaryX, yPos, { align: 'right' });
     doc.text(`$${order.taxAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
     yPos += 6;
     
@@ -319,7 +317,6 @@ export default function BillingPage() {
     doc.text(`$${order.totalAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
     yPos += 15;
 
-    // Footer
     doc.setFontSize(8);
     doc.setFont('helvetica', 'italic');
     doc.text('Thank you for your business! - Generated by StockPilot', pageWidth / 2, pageHeight - 10, { align: 'center' });
@@ -339,7 +336,7 @@ export default function BillingPage() {
     }
 
     const subtotal = billItems.reduce((sum, item) => sum + item.price * item.billQuantity, 0);
-    const taxRate = 0.08; // Example, could be dynamic
+    const taxRate = 0.08; 
     const taxAmount = subtotal * taxRate;
     const totalAmount = subtotal + taxAmount;
 
@@ -362,7 +359,6 @@ export default function BillingPage() {
       subtotal,
       taxAmount,
       totalAmount,
-      // orderDate and orderNumber will be set by the service
     };
     
     const itemsToDecrementStock = billItems.map(item => ({
@@ -373,14 +369,11 @@ export default function BillingPage() {
     try {
       const newOrderId = await addOrderAndDecrementStock(orderData, itemsToDecrementStock);
       
-      // For PDF generation, we need the full order object including server-generated fields
-      // We can either fetch it, or construct it client-side for immediate PDF.
-      // Let's construct it with the data we have for the PDF:
       const tempOrderForPdf: Order = {
           ...orderData,
           id: newOrderId,
-          orderNumber: `ORD-${format(new Date(), 'yyyyMMdd-HHmmssSSS')}`, // Approximate, real one is in DB
-          orderDate: Timestamp.now(), // Approximate
+          orderNumber: `ORD-${format(new Date(), 'yyyyMMdd-HHmmssSSS')}`, 
+          orderDate: Timestamp.now(), 
       }
       
       generateBillPDF(tempOrderForPdf, billItems);
@@ -394,8 +387,8 @@ export default function BillingPage() {
       setSelectedCustomer(null);
       setCustomerSearchTerm('');
       setFoundCustomers([]);
-      fetchProductData(); // Refresh product stock display
-      if (fromOrderId) router.push('/billing'); // Clear query param if it was a re-bill
+      fetchProductData(); 
+      if (fromOrderId) router.push('/billing'); 
     } catch (error) {
       console.error("Error finalizing bill:", error);
       toast({
@@ -406,22 +399,9 @@ export default function BillingPage() {
     }
   };
 
-  if (isLoadingProducts && !fromOrderId) { // Only show full page skeleton if not loading an order
-    return (
-      <div className="space-y-8">
-        <Skeleton className="h-10 w-1/2" />
-        <Skeleton className="h-8 w-1/3" />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-6">
-                <Skeleton className="h-40 w-full" />
-                <Skeleton className="h-60 w-full" />
-            </div>
-            <div className="lg:col-span-1">
-                <Skeleton className="h-48 w-full" />
-            </div>
-        </div>
-      </div>
-    );
+  // Initial loading state for the content, before fromOrderId is processed
+  if (isLoadingProducts && !fromOrderId) { 
+    return <BillingPageLoadingSkeleton />;
   }
 
   return (
@@ -506,3 +486,14 @@ export default function BillingPage() {
     </div>
   );
 }
+
+
+export default function BillingPage() {
+  return (
+    <Suspense fallback={<BillingPageLoadingSkeleton />}>
+      <BillingPageContent />
+    </Suspense>
+  );
+}
+
+    
