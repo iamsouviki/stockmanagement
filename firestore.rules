@@ -3,54 +3,53 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users collection:
-    // - Allow a user to read their own document.
-    // - Allow a user to create their own document (for initial profile setup if it doesn't exist).
-    // - Allow a user to update their own document.
-    // - More specific rules for admin/owner to manage other users will be layered on top.
-    match /users/{userId} {
-      allow read, update: if request.auth != null && request.auth.uid == userId;
-      allow create: if request.auth != null && request.auth.uid == userId;
-      // Listing users or deleting users by admin/owner needs separate, more privileged rules.
-      // Example for listing: allow list: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin'];
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      // User can write to their own document under specific conditions:
+      // 1. If it's a 'create' operation, the incoming data must NOT contain a 'role' field.
+      //    (Role is assumed to be set by trusted logic, e.g., AuthProvider on first sign-in).
+      // 2. If it's an 'update' operation, the 'role' field in the document must NOT change.
+      //    (User can update other profile fields, but not their own role).
+      allow write: if request.auth != null && request.auth.uid == uid &&
+                      ( (request.method == 'create' && !('role' in request.resource.data)) ||
+                        (request.method == 'update' && request.resource.data.role == resource.data.role) );
     }
 
-    // Categories:
-    // - Allow anyone to read categories.
-    // - Allow authenticated users with 'owner', 'admin', or 'employee' roles to write categories.
     match /categories/{categoryId} {
-      allow read: if true;
-      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
+      // All authenticated users can read categories
+      allow read: if request.auth != null;
+      // Owner and Employee can create, update, delete categories
+      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'employee'];
     }
 
-    // Products:
-    // - Allow anyone to read products.
-    // - Allow authenticated users with 'owner', 'admin', or 'employee' roles to write products.
     match /products/{productId} {
-      allow read: if true;
-      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
+      // All authenticated users can read products
+      allow read: if request.auth != null;
+      // Owner and Employee can create, update, delete products
+      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'employee'];
     }
 
-    // Customers:
-    // - Allow authenticated users to read and write customer data.
     match /customers/{customerId} {
-      allow read, write: if request.auth != null;
-      // Deletion can be restricted to 'owner'
-      allow delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
+      // All authenticated users can read customers
+      allow read: if request.auth != null;
+      // Owner and Employee can create, update, delete customers
+      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'employee'];
     }
 
-    // Orders:
-    // - Allow authenticated users to read and create orders.
-    // - Allow 'owner' to update/delete orders.
+    // Rules for the 'orders' collection and its documents
     match /orders/{orderId} {
-      allow read, create: if request.auth != null;
-      allow update, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
-    }
+      // .read in user JSON covers both 'get' (single doc) and 'list' (collection query)
+      allow read: if request.auth != null;
 
-    // It's good practice to have a default deny for any paths not explicitly matched,
-    // but let's ensure the above rules are working first.
-    // match /{document=**} {
-    //  allow read, write: if false;
-    // }
+      // .create from user JSON for /orders
+      allow create: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'employee'];
+
+      // .update from user JSON for /orders/$orderId
+      allow update: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
+
+      // .delete from user JSON for /orders/$orderId
+      allow delete: if false; // Explicitly disallow deletion of orders
+    }
   }
 }
