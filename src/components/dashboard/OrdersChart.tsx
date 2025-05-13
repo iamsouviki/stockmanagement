@@ -2,11 +2,10 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import {
   ChartContainer,
   ChartTooltipContent,
-  ChartLegendContent, // Added for custom legend
 } from "@/components/ui/chart";
 import { getOrders } from '@/services/firebaseService';
 import type { Order } from '@/types';
@@ -61,7 +60,7 @@ const OrdersChart = () => {
         });
         
         const processedData: DailyOrderData[] = last7Days.map(date => ({
-          date: format(parseISO(date), 'dd MMM'), // Shortened date format
+          date: format(parseISO(date), 'dd MMM'), 
           orders: dailyOrdersMap.get(date) || 0,
         }));
 
@@ -90,7 +89,7 @@ const OrdersChart = () => {
   const chartConfig = {
     orders: {
       label: "Orders",
-      color: "hsl(var(--chart-1))", // Using a chart color from theme
+      color: "hsl(var(--chart-1))", 
     },
   } satisfies Record<string, any>;
 
@@ -100,8 +99,9 @@ const OrdersChart = () => {
       <ResponsiveContainer width="100%" height="100%">
         <BarChart 
           data={chartData} 
-          margin={{ top: 5, right: 5, left: -20, bottom: 5 }} // Adjusted left margin for YAxis
-          barCategoryGap="20%" // Adds space between bars
+          margin={{ top: 5, right: 0, left: -25, bottom: 0 }} // Adjusted margins
+          barCategoryGap="25%" 
+          barSize={25} // Slightly reduce bar size
         >
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
           <XAxis
@@ -109,23 +109,21 @@ const OrdersChart = () => {
             tickLine={false}
             axisLine={false}
             tickMargin={8}
-            fontSize={10} 
-            interval="preserveStartEnd" // More robust for varying number of ticks
+            fontSize={9} // Reduced font size
+            interval="preserveStartEnd" 
           />
           <YAxis 
             tickLine={false} 
             axisLine={false} 
             tickMargin={8} 
-            fontSize={10} 
+            fontSize={9} // Reduced font size
             allowDecimals={false} 
-            // width={25} // Removed fixed width to allow auto-sizing
           />
           <Tooltip
             cursor={{ fill: 'hsl(var(--muted))', radius: 4 }}
             content={<ChartTooltipContent />}
           />
-          {/* <Legend content={<ChartLegendContent nameKey="date" />} verticalAlign="top" wrapperStyle={{paddingBottom: '10px'}} /> */}
-          <Bar dataKey="orders" fill="var(--color-orders)" radius={[4, 4, 0, 0]} maxBarSize={40} />
+          <Bar dataKey="orders" fill="var(--color-orders)" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </ChartContainer>

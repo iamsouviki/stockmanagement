@@ -2,16 +2,14 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import {
   ChartContainer,
   ChartTooltipContent,
-  ChartLegendContent, // Added for custom legend if needed
 } from "@/components/ui/chart";
-import { getOrders, getProducts, getProduct } from '@/services/firebaseService';
-import type { Order, Product as ProductType } from '@/types';
+import { getOrders, getProduct } from '@/services/firebaseService';
+import type { Order } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Timestamp } from 'firebase/firestore';
 
 interface ProductSalesData {
   name: string;
@@ -27,37 +25,41 @@ const TopSellingProductsChart = () => {
       setIsLoading(true);
       try {
         const orders = await getOrders();
-        const productSalesMap = new Map<string, number>();
+        const productSalesMap = new Map<string, { quantity: number; name?: string }>();
 
         orders.forEach(order => {
           order.items.forEach(item => {
+            const existing = productSalesMap.get(item.productId);
             productSalesMap.set(
               item.productId,
-              (productSalesMap.get(item.productId) || 0) + item.billQuantity
+              { 
+                quantity: (existing?.quantity || 0) + item.billQuantity,
+                name: item.name // Store name from order item first
+              }
             );
           });
         });
-
+        
         const sortedProductSales = Array.from(productSalesMap.entries())
-          .sort(([, qtyA], [, qtyB]) => qtyB - qtyA)
-          .slice(0, 5); // Get top 5
+          .sort(([, dataA], [, dataB]) => dataB.quantity - dataA.quantity)
+          .slice(0, 5); 
 
-        const productDetailsPromises = sortedProductSales.map(async ([productId, quantitySold]) => {
-          const product = await getProduct(productId);
+        const productDetailsPromises = sortedProductSales.map(async ([productId, data]) => {
+          // Use name from order item if available, otherwise fetch
+          let productName = data.name;
+          if (!productName) {
+            const product = await getProduct(productId);
+            productName = product?.name || `Product ID: ${productId.substring(0,6)}...`;
+          }
+          
           return {
-            name: product?.name || `Product ID: ${productId.substring(0,6)}...`, // Fallback name
-            quantitySold,
+            name: productName.length > 12 ? `${productName.substring(0, 10)}...` : productName, // Shorten for Y-axis
+            originalName: productName, // Keep original for tooltip
+            quantitySold: data.quantity,
           };
         });
         
-        let resolvedProductDetails = await Promise.all(productDetailsPromises);
-
-        // Shorten names for display
-        resolvedProductDetails = resolvedProductDetails.map(p => ({
-            ...p,
-            name: p.name.length > 15 ? `${p.name.substring(0, 13)}...` : p.name,
-        }));
-        
+        const resolvedProductDetails = await Promise.all(productDetailsPromises);
         setChartData(resolvedProductDetails);
 
       } catch (error) {
@@ -84,8 +86,12 @@ const TopSellingProductsChart = () => {
   const chartConfig = {
     quantitySold: {
       label: "Units Sold",
-      color: "hsl(var(--chart-2))", // Using a different chart color from theme
+      color: "hsl(var(--chart-2))", 
     },
+     // Add this to ensure originalName is available in tooltip config
+    originalName: {
+      label: "Product Name",
+    }
   } satisfies Record<string, any>;
 
   return (
@@ -94,8 +100,7 @@ const TopSellingProductsChart = () => {
         <BarChart 
           data={chartData} 
           layout="vertical" 
-          margin={{ top: 5, right: 20, left: 10, bottom: 5 }} // Adjusted margins for labels
-          barCategoryGap="20%" // Adds space between bars
+          margin={{ top: 5, right: 10, left: 0, bottom: 0 }} // Adjusted margins
         >
           <CartesianGrid strokeDasharray="3 3" horizontal={false} />
           <XAxis 
@@ -103,7 +108,7 @@ const TopSellingProductsChart = () => {
             tickLine={false} 
             axisLine={false} 
             tickMargin={8} 
-            fontSize={10} 
+            fontSize={9} // Reduced font size
             allowDecimals={false} 
           />
           <YAxis
@@ -112,20 +117,32 @@ const TopSellingProductsChart = () => {
             tickLine={false}
             axisLine={false}
             tickMargin={5}
-            fontSize={10}
-            width={80} // Increased width for potentially longer (shortened) names
-            interval={0} // Ensure all labels are shown
+            fontSize={9} // Reduced font size
+            width={70} // Adjusted width for Y-axis labels
+            interval={0} 
           />
           <Tooltip
             cursor={{ fill: 'hsl(var(--muted))', radius: 4 }}
-            content={<ChartTooltipContent />}
+            content={<ChartTooltipContent 
+                        formatter={(value, name, props) => {
+                           if (name === 'quantitySold' && props.payload.originalName) {
+                             return [value, chartConfig.quantitySold.label];
+                           }
+                           return [value, name];
+                        }}
+                        labelFormatter={(label, payload) => {
+                            if (payload && payload.length > 0 && payload[0].payload.originalName) {
+                                return payload[0].payload.originalName;
+                            }
+                            return label;
+                        }}
+                    />}
           />
-          {/* <Legend content={<ChartLegendContent nameKey="name" />} verticalAlign="top" wrapperStyle={{paddingBottom: '10px'}}/> */}
           <Bar 
             dataKey="quantitySold" 
             fill="var(--color-quantitySold)" 
-            radius={[0, 4, 4, 0]} // Rounded corners on one side for horizontal bars
-            barSize={20} // Fixed bar size for better appearance
+            radius={[0, 4, 4, 0]} 
+            barSize={18} // Adjusted bar size
           />
         </BarChart>
       </ResponsiveContainer>

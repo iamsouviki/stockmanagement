@@ -2,7 +2,7 @@
 'use client'; 
 
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Removed CardFooter as it's not directly used at the top level of this page for all cards
 import { Button } from '@/components/ui/button';
 import { Boxes, Receipt, ArrowRight, Users, History, BarChart3, LineChart, Tags, UserCog } from 'lucide-react'; 
 import { Suspense } from 'react';
@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import AuthGuard from '@/components/auth/AuthGuard'; 
 import type { UserRole } from '@/types';
 import { useAuth } from '@/hooks/useAuth'; 
+import { CardFooter } from "@/components/ui/card"; // Explicitly import CardFooter where needed
 
 function ChartSkeleton() {
   return <Skeleton className="h-[280px] sm:h-[320px] w-full rounded-lg" />;
@@ -53,7 +54,7 @@ export default function DashboardPage() {
               </CardTitle>
               <CardDescription className="text-xs sm:text-sm">Daily order volume.</CardDescription>
             </CardHeader>
-            <CardContent className="h-[280px] sm:h-[320px] px-2 sm:px-4">
+            <CardContent className="min-h-[280px] sm:min-h-[320px] px-1 sm:px-2 md:px-4"> {/* Adjusted padding */}
               <Suspense fallback={<ChartSkeleton />}>
                 <OrdersChart />
               </Suspense>
@@ -66,7 +67,7 @@ export default function DashboardPage() {
               </CardTitle>
               <CardDescription className="text-xs sm:text-sm">Units sold for top products.</CardDescription>
             </CardHeader>
-            <CardContent className="h-[280px] sm:h-[320px] px-2 sm:px-4">
+            <CardContent className="min-h-[280px] sm:min-h-[320px] px-1 sm:px-2 md:px-4"> {/* Adjusted padding */}
               <Suspense fallback={<ChartSkeleton />}>
                 <TopSellingProductsChart />
               </Suspense>
