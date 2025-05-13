@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Boxes, Receipt, ArrowRight, Users } from 'lucide-react';
+import { Boxes, Receipt, ArrowRight, Users, History } from 'lucide-react'; // Added History
 
 export default function DashboardPage() {
   return (
@@ -13,7 +13,7 @@ export default function DashboardPage() {
         </p>
       </section>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
         <Card className="shadow-lg hover:shadow-xl transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-2xl font-semibold">Manage Products</CardTitle>
@@ -21,7 +21,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <CardDescription className="mb-4">
-              View, add, and update your product inventory. Keep track of serial numbers, stock levels, and more.
+              View, add, and update your product inventory.
             </CardDescription>
             <Button asChild variant="default" className="bg-primary hover:bg-primary/90">
               <Link href="/products">
@@ -38,11 +38,28 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <CardDescription className="mb-4">
-              Quickly generate bills for customers by adding products via barcode or manual entry.
+              Generate bills by adding products via barcode or manual entry.
             </CardDescription>
             <Button asChild variant="default" className="bg-primary hover:bg-primary/90">
               <Link href="/billing">
                 Go to Billing <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg hover:shadow-xl transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-2xl font-semibold">Order History</CardTitle>
+            <History className="h-8 w-8 text-accent" />
+          </CardHeader>
+          <CardContent>
+            <CardDescription className="mb-4">
+              View past orders and generate duplicate bills if needed.
+            </CardDescription>
+            <Button asChild variant="default" className="bg-primary hover:bg-primary/90">
+              <Link href="/orders">
+                View Orders <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           </CardContent>
@@ -55,7 +72,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <CardDescription className="mb-4">
-              View, add, and update customer information. Search by mobile number.
+              View, add, and update customer information.
             </CardDescription>
             <Button asChild variant="default" className="bg-primary hover:bg-primary/90">
               <Link href="/customers">
@@ -69,11 +86,11 @@ export default function DashboardPage() {
       <section className="mt-12 p-6 bg-card rounded-lg shadow">
         <h2 className="text-xl font-semibold mb-3 text-primary">Key Features</h2>
         <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-          <li><span className="font-medium text-foreground">Barcode Scanning Mockup:</span> Simulate quick product identification.</li>
-          <li><span className="font-medium text-foreground">Manual Serial Number Entry:</span> Easily add or edit product details.</li>
-          <li><span className="font-medium text-foreground">Simple Bill Generation:</span> Create customer bills efficiently.</li>
-          <li><span className="font-medium text-foreground">Customer Management:</span> Keep track of your customer base.</li>
-          <li><span className="font-medium text-foreground">Clean & Professional UI:</span> Modern design for ease of use.</li>
+          <li><span className="font-medium text-foreground">Firebase Integration:</span> All data stored securely in Firestore.</li>
+          <li><span className="font-medium text-foreground">Real-time Stock Updates:</span> Inventory levels adjusted after each sale.</li>
+          <li><span className="font-medium text-foreground">Order History:</span> Track all past transactions and re-bill.</li>
+          <li><span className="font-medium text-foreground">Customer Management:</span> Maintain your customer database.</li>
+          <li><span className="font-medium text-foreground">Modern PDF Bills:</span> Professional invoices with store branding.</li>
         </ul>
       </section>
     </div>

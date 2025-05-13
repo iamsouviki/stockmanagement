@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -7,20 +6,33 @@ import CustomerTable from "@/components/customers/CustomerTable";
 import CustomerDialog from "@/components/customers/CustomerDialog";
 import type { CustomerFormData } from "@/components/customers/CustomerForm";
 import type { Customer } from "@/types";
-import { mockCustomers as initialCustomers } from "@/data/mockData";
 import { PlusCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { getCustomers, addCustomer, updateCustomer, deleteCustomer, findCustomerByMobile } from "@/services/firebaseService";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    setCustomers(initialCustomers);
-  }, []);
+    const fetchCustomers = async () => {
+      setIsLoading(true);
+      try {
+        const fetchedCustomers = await getCustomers();
+        setCustomers(fetchedCustomers);
+      } catch (error) {
+        console.error("Error fetching customers:", error);
+        toast({ title: "Error", description: "Failed to fetch customers.", variant: "destructive" });
+      }
+      setIsLoading(false);
+    };
+    fetchCustomers();
+  }, [toast]);
   
   const handleAddCustomer = () => {
     setEditingCustomer(null);
@@ -32,64 +44,84 @@ export default function CustomersPage() {
     setIsDialogOpen(true);
   };
 
-  const handleDeleteCustomer = (customerId: string) => {
-    setCustomers(customers.filter((c) => c.id !== customerId));
-    toast({
-      title: "Customer Deleted",
-      description: "The customer has been successfully removed.",
-      variant: "destructive",
-    });
-  };
-
-  const handleSubmitCustomer = (data: CustomerFormData) => {
-    const existingMobileNumbers = customers
-      .filter(c => editingCustomer ? c.id !== editingCustomer.id : true)
-      .map(c => c.mobileNumber);
-
-    if (existingMobileNumbers.includes(data.mobileNumber)) {
+  const handleDeleteCustomer = async (customerId: string) => {
+    try {
+      await deleteCustomer(customerId);
+      setCustomers(customers.filter((c) => c.id !== customerId));
       toast({
-        title: "Mobile Number Exists",
-        description: "This mobile number is already associated with another customer. Please use a unique mobile number.",
+        title: "Customer Deleted",
+        description: "The customer has been successfully removed.",
         variant: "destructive",
       });
-      return;
+    } catch (error) {
+      console.error("Error deleting customer:", error);
+      toast({ title: "Error", description: "Failed to delete customer.", variant: "destructive" });
     }
+  };
 
-    if (editingCustomer) {
-      setCustomers(
-        customers.map((c) =>
-          c.id === editingCustomer.id ? { ...editingCustomer, ...data } : c
-        )
+  const handleSubmitCustomer = async (data: CustomerFormData) => {
+    try {
+      // Check for mobile number uniqueness
+      const existingCustomersWithMobile = await findCustomerByMobile(data.mobileNumber);
+      const isMobileTaken = existingCustomersWithMobile.some(
+        c => editingCustomer ? c.id !== editingCustomer.id : true
       );
-      toast({
-        title: "Customer Updated",
-        description: `Information for "${data.name}" has been successfully updated.`,
-      });
-    } else {
-      const newCustomer: Customer = {
-        ...data,
-        id: `cust${Date.now()}`, 
-        imageUrl: `https://picsum.photos/seed/${encodeURIComponent(data.name.split(" ")[0])}/200/200`,
-        imageHint: "person avatar",
-      };
-      setCustomers([newCustomer, ...customers]);
-      toast({
-        title: "Customer Added",
-        description: `"${data.name}" has been successfully added.`,
-      });
+
+      if (isMobileTaken) {
+        toast({
+          title: "Mobile Number Exists",
+          description: "This mobile number is already associated with another customer.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (editingCustomer) {
+        await updateCustomer(editingCustomer.id, data);
+        setCustomers(
+          customers.map((c) =>
+            c.id === editingCustomer.id ? { ...editingCustomer, ...data } : c
+          )
+        );
+        toast({
+          title: "Customer Updated",
+          description: `Information for "${data.name}" has been successfully updated.`,
+        });
+      } else {
+        const customerData = {
+          ...data,
+          imageUrl: `https://picsum.photos/seed/${encodeURIComponent(data.name.split(" ")[0])}/200/200`,
+          imageHint: "person avatar",
+        };
+        const newCustomerId = await addCustomer(customerData);
+        const newCustomerEntry: Customer = {
+          ...customerData,
+          id: newCustomerId,
+        };
+        setCustomers([newCustomerEntry, ...customers]);
+        toast({
+          title: "Customer Added",
+          description: `"${data.name}" has been successfully added.`,
+        });
+      }
+      setIsDialogOpen(false);
+      setEditingCustomer(null);
+    } catch (error) {
+      console.error("Error saving customer:", error);
+      toast({ title: "Error", description: "Failed to save customer.", variant: "destructive" });
     }
-    setIsDialogOpen(false);
-    setEditingCustomer(null);
   };
 
   const filteredCustomers = useMemo(() => {
     if (!searchTerm) return customers;
     return customers.filter(customer => 
-      customer.mobileNumber.toLowerCase().includes(searchTerm.toLowerCase())
+      customer.mobileNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [customers, searchTerm]);
 
   const existingMobileNumbers = useMemo(() => customers.map(c => c.mobileNumber), [customers]);
+
 
   return (
     <div className="space-y-6">
@@ -104,21 +136,30 @@ export default function CustomersPage() {
           <PlusCircle className="mr-2 h-5 w-5" /> Add New Customer
         </Button>
       </div>
-
-      <CustomerTable
-        customers={filteredCustomers}
-        onEdit={handleEditCustomer}
-        onDelete={handleDeleteCustomer}
-        searchTerm={searchTerm}
-        onSearchTermChange={setSearchTerm}
-      />
+      
+      {isLoading ? (
+         <div className="space-y-4">
+          <Skeleton className="h-10 w-full sm:w-72 mb-4" />
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </div>
+      ) : (
+        <CustomerTable
+          customers={filteredCustomers}
+          onEdit={handleEditCustomer}
+          onDelete={handleDeleteCustomer}
+          searchTerm={searchTerm}
+          onSearchTermChange={setSearchTerm}
+        />
+      )}
 
       <CustomerDialog
         isOpen={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         customer={editingCustomer}
         onSubmit={handleSubmitCustomer}
-        existingMobileNumbers={existingMobileNumbers}
+        existingMobileNumbers={existingMobileNumbers} // This prop might be less useful with async validation
       />
     </div>
   );

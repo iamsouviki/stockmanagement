@@ -1,6 +1,5 @@
 "use client";
 
-import type { Control } from "react-hook-form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -22,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Product, Category } from "@/types";
-import { mockCategories } from "@/data/mockData"; // Assuming categories are available
+// import { mockCategories } from "@/data/mockData"; // Remove mockCategories
 
 const productSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -31,6 +30,7 @@ const productSchema = z.object({
   price: z.coerce.number().min(0.01, "Price must be greater than 0."),
   quantity: z.coerce.number().int().min(0, "Quantity cannot be negative."),
   categoryId: z.string().min(1, "Category is required."),
+  // imageUrl and imageHint are not part of the form directly, handled on product creation
 });
 
 export type ProductFormData = z.infer<typeof productSchema>;
@@ -39,9 +39,10 @@ interface ProductFormProps {
   product?: Product | null;
   onSubmit: (data: ProductFormData) => void;
   onCancel: () => void;
+  categories: Category[]; // Receive categories as a prop
 }
 
-const ProductForm: React.FC<ProductFormProps> = ({ product, onSubmit, onCancel }) => {
+const ProductForm: React.FC<ProductFormProps> = ({ product, onSubmit, onCancel, categories }) => {
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productSchema),
     defaultValues: product
@@ -63,7 +64,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSubmit, onCancel }
         },
   });
 
-  const categories: Category[] = mockCategories;
+  // const categories: Category[] = mockCategories; // Use passed prop
 
   return (
     <Form {...form}>

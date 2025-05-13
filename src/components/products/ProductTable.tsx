@@ -2,8 +2,8 @@
 "use client";
 
 import Image from 'next/image';
-import type { Product } from "@/types";
-import { mockCategories, categoryIcons } from "@/data/mockData";
+import type { Product, Category } from "@/types"; // Import Category
+import { categoryIcons } from "@/data/mockData"; // Keep for icons if IDs are stable
 import {
   Table,
   TableBody,
@@ -32,17 +32,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 interface ProductTableProps {
   products: Product[];
+  categories: Category[]; // Add categories prop
   onEdit: (product: Product) => void;
   onDelete: (productId: string) => void;
 }
 
-const ProductTable: React.FC<ProductTableProps> = ({ products, onEdit, onDelete }) => {
-  const getCategoryName = (categoryId: string) => {
-    return mockCategories.find(cat => cat.id === categoryId)?.name || "Unknown";
-  };
+const ProductTable: React.FC<ProductTableProps> = ({ products, categories, onEdit, onDelete }) => {
+  // categoryName is now part of the Product object if denormalized
+  // If not, you would find it from the categories prop:
+  // const getCategoryName = (categoryId: string) => {
+  //   return categories.find(cat => cat.id === categoryId)?.name || "Unknown";
+  // };
 
   const CategoryIcon = ({ categoryId }: { categoryId: string }) => {
-    const IconComponent = categoryIcons[categoryId] || Package;
+    const IconComponent = categoryIcons[categoryId] || Package; // Fallback icon
     return <IconComponent className="h-5 w-5 text-muted-foreground" />;
   };
 
@@ -86,7 +89,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onEdit, onDelete 
                           width={40}
                           height={40}
                           className="rounded-md object-cover"
-                          data-ai-hint={product.imageHint || "product image"}
+                          data-ai-hint={product.imageHint || "product item"}
                         />
                       ) : (
                         <div className="w-10 h-10 bg-secondary rounded-md flex items-center justify-center">
@@ -98,7 +101,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onEdit, onDelete 
                     <TableCell>
                       <Badge variant="secondary" className="flex items-center gap-1.5 w-fit">
                         <CategoryIcon categoryId={product.categoryId} />
-                        {getCategoryName(product.categoryId)}
+                        {product.categoryName || "Unknown"} 
                       </Badge>
                     </TableCell>
                     <TableCell>{product.serialNumber}</TableCell>

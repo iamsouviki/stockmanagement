@@ -6,13 +6,14 @@ import Logo from '@/components/icons/Logo';
 import NavItem from './NavItem';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import type * as LucideIcons from 'lucide-react'; // Import type for keyof
-import { Menu } from 'lucide-react'; // Keep Menu for direct usage
+import type * as LucideIcons from 'lucide-react'; 
+import { Menu, History } from 'lucide-react'; // Added History
 
 const navLinks: Array<{ href: string; label: string; iconName: keyof typeof LucideIcons }> = [
   { href: '/', label: 'Dashboard', iconName: 'LayoutDashboard' },
   { href: '/products', label: 'Products', iconName: 'Boxes' },
   { href: '/billing', label: 'Billing', iconName: 'Receipt' },
+  { href: '/orders', label: 'Orders', iconName: 'History' }, // Added Orders link
   { href: '/customers', label: 'Customers', iconName: 'Users' },
 ];
 
@@ -28,7 +29,7 @@ const Header = () => {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-2">
+          <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
             {navLinks.map((link) => (
               <NavItem key={link.href} href={link.href} label={link.label} iconName={link.iconName} />
             ))}

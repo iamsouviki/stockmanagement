@@ -8,13 +8,14 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import ProductForm, { type ProductFormData } from "./ProductForm";
-import type { Product } from "@/types";
+import type { Product, Category } from "@/types"; // Import Category
 
 interface ProductDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  product?: Product | null; // For editing
+  product?: Product | null;
   onSubmit: (data: ProductFormData) => void;
+  categories: Category[]; // Add categories prop
 }
 
 const ProductDialog: React.FC<ProductDialogProps> = ({
@@ -22,10 +23,11 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
   onOpenChange,
   product,
   onSubmit,
+  categories, // Destructure categories
 }) => {
   const handleSubmit = (data: ProductFormData) => {
     onSubmit(data);
-    onOpenChange(false); // Close dialog on submit
+    onOpenChange(false);
   };
 
   return (
@@ -45,6 +47,7 @@ const ProductDialog: React.FC<ProductDialogProps> = ({
           product={product}
           onSubmit={handleSubmit}
           onCancel={() => onOpenChange(false)}
+          categories={categories} // Pass categories to ProductForm
         />
       </DialogContent>
     </Dialog>
