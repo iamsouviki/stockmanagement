@@ -46,7 +46,10 @@ export default function Header() {
           )
         );
       } else {
-        setVisibleNavLinks(navLinks.filter(link => !link.roles || link.href === '/')); 
+        // For logged-out users, only show links that don't have specific roles or adjust as needed
+        // Currently, this logic means logged-out users would see all links unless roles are strictly enforced
+        // A common pattern is to show only public links or a login link
+        setVisibleNavLinks(navLinks.filter(link => !link.roles || link.href === '/login' || link.href === '/')); 
       }
     }
   }, [currentUser, userProfile, isLoading]);
@@ -67,13 +70,13 @@ export default function Header() {
             <Logo className="h-7 sm:h-8 w-auto" />
           </Link>
 
-          <nav className="hidden md:flex items-center space-x-1">
+          <nav className="hidden lg:flex items-center space-x-1"> {/* Changed md:flex to lg:flex */}
             {!isLoading && visibleNavLinks.map((link) => (
               <NavItem key={link.href} href={link.href} label={link.label} icon={link.icon} currentPathname={pathname}/>
             ))}
           </nav>
 
-          <div className="hidden md:flex items-center ml-2">
+          <div className="hidden lg:flex items-center ml-2"> {/* Changed md:flex to lg:flex */}
             {isLoading ? (
               <Button variant="ghost" size="sm" className="text-primary-foreground hover:bg-primary-foreground/20" disabled>Loading...</Button>
             ) : currentUser ? (
@@ -89,7 +92,7 @@ export default function Header() {
             )}
           </div>
 
-          <div className="md:hidden flex items-center">
+          <div className="lg:hidden flex items-center"> {/* Changed md:hidden to lg:hidden */}
             {isLoading ? (
                  <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/20 h-9 w-9 sm:h-10 sm:w-10" disabled></Button> 
             ) : currentUser && ( 
@@ -147,3 +150,4 @@ export default function Header() {
     </header>
   );
 }
+
