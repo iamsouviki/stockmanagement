@@ -34,6 +34,8 @@ export default function DashboardPage() {
       ? `Welcome, ${userProfile.displayName}!` 
       : "Welcome!";
 
+  const isUserManagementCardVisible = !isLoading && userProfile && userManagementRoles.includes(userProfile.role);
+
   return (
     <AuthGuard> 
       <div className="space-y-6 md:space-y-8">
@@ -148,7 +150,11 @@ export default function DashboardPage() {
           </AuthGuard>
           
           <AuthGuard allowedRoles={customerManagementRoles} redirectPath='/login'>
-            <Card className="shadow-lg hover:shadow-xl transition-shadow sm:col-span-2 lg:col-span-2 xl:col-span-2">
+            <Card className={`shadow-lg hover:shadow-xl transition-shadow ${
+              isUserManagementCardVisible 
+                ? 'sm:col-span-2 lg:col-span-2 xl:col-span-2' // Original span if User Management is visible
+                : 'sm:col-span-2 lg:col-span-4 xl:col-span-4' // Span full width on lg/xl if User Management is hidden
+            }`}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xl sm:text-2xl font-semibold">Manage Customers</CardTitle>
                 <Users className="h-7 w-7 sm:h-8 sm:w-8 text-accent" />
@@ -166,24 +172,26 @@ export default function DashboardPage() {
             </Card>
           </AuthGuard>
 
-          <AuthGuard allowedRoles={userManagementRoles} redirectPath='/login'>
-            <Card className="shadow-lg hover:shadow-xl transition-shadow sm:col-span-2 lg:col-span-2 xl:col-span-2"> 
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-xl sm:text-2xl font-semibold">User Management</CardTitle>
-                <UserCog className="h-7 w-7 sm:h-8 sm:w-8 text-accent" />
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="mb-3 sm:mb-4 text-sm sm:text-base">
-                  Manage user accounts, roles, and logout from your session.
-                </CardDescription>
-                <Button asChild variant="default" className="w-full sm:w-auto bg-primary hover:bg-primary/90">
-                  <Link href="/settings/user-management">
-                    Go to User Management <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </AuthGuard>
+          {isUserManagementCardVisible && (
+            <AuthGuard allowedRoles={userManagementRoles} redirectPath='/login'>
+              <Card className="shadow-lg hover:shadow-xl transition-shadow sm:col-span-2 lg:col-span-2 xl:col-span-2"> 
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-xl sm:text-2xl font-semibold">User Management</CardTitle>
+                  <UserCog className="h-7 w-7 sm:h-8 sm:w-8 text-accent" />
+                </CardHeader>
+                <CardContent>
+                  <CardDescription className="mb-3 sm:mb-4 text-sm sm:text-base">
+                    Manage user accounts, roles, and logout from your session.
+                  </CardDescription>
+                  <Button asChild variant="default" className="w-full sm:w-auto bg-primary hover:bg-primary/90">
+                    <Link href="/settings/user-management">
+                      Go to User Management <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </AuthGuard>
+          )}
         </div>
         
         <footer className="text-center py-4 text-sm text-muted-foreground">

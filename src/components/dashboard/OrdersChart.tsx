@@ -89,7 +89,7 @@ const OrdersChart = () => {
   return (
     <ChartContainer config={chartConfig} className="min-h-[250px] w-full">
       <ResponsiveContainer width="100%" height={250}>
-        <BarChart data={chartData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+        <BarChart data={chartData} margin={{ top: 5, right: 20, left: 5, bottom: 5 }}> {/* Adjusted left margin */}
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="date"
