@@ -6,17 +6,17 @@ import Logo from '@/components/icons/Logo';
 import NavItem from './NavItem';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Menu, Home, Boxes, Receipt, History, Users, Tags, LogIn, LogOut, SettingsIcon } from 'lucide-react'; // Added LogIn, LogOut, SettingsIcon
+import { Menu, Home, Boxes, Receipt, History, Users, Tags, LogIn, LogOut, SettingsIcon } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { usePathname } from 'next/navigation'; 
 import { useState, useEffect } from 'react'; 
-import { useAuth } from '@/hooks/useAuth'; // Import useAuth
+import { useAuth } from '@/hooks/useAuth';
 
 interface NavLink {
   href: string;
   label: string;
   icon: LucideIcon;
-  roles?: ('owner' | 'employee')[]; // Optional roles to display the link
+  roles?: ('owner' | 'employee')[];
 }
 
 const navLinks: NavLink[] = [
@@ -32,7 +32,7 @@ const navLinks: NavLink[] = [
 export default function Header() {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { currentUser, userProfile, logout, isLoading } = useAuth(); // Get auth state and logout function
+  const { currentUser, userProfile, logout, isLoading } = useAuth();
 
   const [visibleNavLinks, setVisibleNavLinks] = useState<NavLink[]>([]);
 
@@ -45,12 +45,18 @@ export default function Header() {
           )
         );
       } else {
-        // Show minimal links or public links if user is not logged in. For now, dashboard only.
-        setVisibleNavLinks(navLinks.filter(link => link.href === '/')); 
+        // For non-logged-in users, only show links that don't require roles
+        // or specific public links. Currently, this will effectively hide most links
+        // if they all have role restrictions. The login button will be the primary CTA.
+        setVisibleNavLinks(navLinks.filter(link => !link.roles));
       }
     }
   }, [currentUser, userProfile, isLoading]);
 
+  // Do not render header on the login page
+  if (pathname === '/login') {
+    return null;
+  }
 
   return (
     <header className="bg-primary shadow-md sticky top-0 z-50">
@@ -91,9 +97,8 @@ export default function Header() {
 
           {/* Mobile Navigation Trigger */}
           <div className="md:hidden flex items-center">
-             {/* Auth Button Mobile (before menu icon for better flow) */}
             {isLoading ? (
-                 <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/20 h-9 w-9 sm:h-10 sm:w-10" disabled></Button> /* Placeholder for width */
+                 <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/20 h-9 w-9 sm:h-10 sm:w-10" disabled></Button> 
             ) : currentUser ? (
               <Button variant="ghost" size="icon" onClick={logout} className="text-primary-foreground hover:bg-primary-foreground/20 h-9 w-9 sm:h-10 sm:w-10 mr-1">
                 <LogOut className="h-5 w-5 sm:h-6 sm:w-6" />

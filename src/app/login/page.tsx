@@ -29,10 +29,11 @@ export default function LoginPage() {
     );
   }
 
-
+  // If not loading and no current user, show the login form.
+  // The header is now hidden on this page by logic in Header.tsx.
+  // Adjust min-height to ensure proper centering.
   return (
-    <div className="flex flex-col justify-center items-center min-h-[calc(100vh-var(--header-height,10rem))] py-8 sm:py-12 bg-background">
-        {/* Adjusted min-height to account for potential header, py for padding */}
+    <div className="flex flex-col justify-center items-center min-h-screen py-8 sm:py-12 bg-background">
       <LoginForm />
     </div>
   );

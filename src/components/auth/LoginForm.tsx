@@ -21,6 +21,15 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
+// To create user credentials for login:
+// 1. Go to your Firebase project in the Firebase Console (console.firebase.google.com).
+// 2. Navigate to the "Authentication" section.
+// 3. Under the "Users" tab, click "Add user".
+// 4. Enter the user's email and password.
+// 5. Click "Add user". This user can then log in to the application with these credentials.
+//    You'll also need to create a corresponding user profile in the Firestore 'users' collection
+//    with the same UID, email, and an assigned role ('owner' or 'employee').
+
 export default function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
