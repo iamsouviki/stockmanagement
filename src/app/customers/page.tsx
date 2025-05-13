@@ -12,7 +12,7 @@ import { getCustomers, addCustomer, updateCustomer, deleteCustomer, findCustomer
 import { Skeleton } from "@/components/ui/skeleton";
 import AuthGuard from "@/components/auth/AuthGuard";
 
-const allowedRoles: UserRole[] = ['owner', 'employee'];
+const allowedRoles: UserRole[] = ['owner', 'admin', 'employee']; // Added 'admin'
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);

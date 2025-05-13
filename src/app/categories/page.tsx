@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import AuthGuard from "@/components/auth/AuthGuard";
 
-const allowedRoles: UserRole[] = ['owner', 'employee'];
+const allowedRoles: UserRole[] = ['owner', 'admin', 'employee']; // Added 'admin'
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
