@@ -92,7 +92,7 @@ export const findCategoryByNameOrCreate = async (name: string): Promise<Category
     return existingCategory;
   } else {
     const newCategoryData = { name: trimmedName };
-    return addCategory(newCategoryData); // Use the modified addCategory
+    return addCategory(newCategoryData); 
   }
 };
 
@@ -154,12 +154,12 @@ export const addOrderAndDecrementStock = async (
   const now = new Date();
   const orderNumber = `ORD-${format(now, 'yyyyMMdd-HHmmssSSS')}`;
   
-  const completeOrderData = { // Explicitly define to avoid passing undefined serverTimestamp directly
+  const completeOrderData = { 
     ...orderData, 
     orderNumber,
     orderDate: Timestamp.fromDate(now),
-    createdAt: serverTimestamp(), // Firestore will set this as Timestamp
-    updatedAt: serverTimestamp(), // Firestore will set this as Timestamp
+    createdAt: serverTimestamp(), 
+    updatedAt: serverTimestamp(), 
   };
 
   const newOrderRef = doc(collection(db, 'orders'));
@@ -194,9 +194,9 @@ export const updateOrderAndAdjustStock = async (
     throw new Error(`Order with ID ${orderId} not found for update.`);
   }
 
-  const stockAdjustments = new Map<string, number>(); // productId -> netStockChange (positive for return, negative for sale)
+  const stockAdjustments = new Map<string, number>(); // productId -> netStockChange
 
-  // 1. Calculate stock to be returned from original items
+  // 1. Calculate stock to be "returned" from original items based on their billQuantity
   originalOrder.items.forEach(originalItem => {
     stockAdjustments.set(
       originalItem.productId,
@@ -204,7 +204,7 @@ export const updateOrderAndAdjustStock = async (
     );
   });
 
-  // 2. Calculate stock to be decremented for updated items
+  // 2. Calculate stock to be "taken" for updated items based on their billQuantity
   updatedOrderPayload.items.forEach(updatedItem => {
     stockAdjustments.set(
       updatedItem.productId,
@@ -212,48 +212,46 @@ export const updateOrderAndAdjustStock = async (
     );
   });
   
-  // 3. Apply stock adjustments to products
-  // This loop needs to be async if getDoc is inside, but batch updates are synchronous preparations.
-  // It's better to fetch all products first if needed, or assume client validated stock for new quantities.
-  // For simplicity in this batch, we'll fetch current stock for each product being adjusted.
-  const productRefsToUpdate: { ref: any, newStock: number }[] = [];
+  // 3. Prepare product stock updates after fetching current stock for validation
+  const productUpdatePromises: Promise<void>[] = [];
 
   for (const [productId, netChange] of stockAdjustments.entries()) {
-    if (netChange === 0) continue; // No change for this product
+    if (netChange === 0) continue; 
 
     const productRef = doc(db, 'products', productId);
-    const productSnap = await getDoc(productRef); 
+    productUpdatePromises.push(
+      getDoc(productRef).then(productSnap => {
+        if (productSnap.exists()) {
+          const currentStock = productSnap.data().quantity || 0;
+          const newStock = currentStock + netChange; 
 
-    if (productSnap.exists()) {
-      const currentStock = productSnap.data().quantity || 0;
-      const newStock = currentStock + netChange; // netChange is +ve for return, -ve for sale
-
-      if (newStock < 0) {
-        // This should ideally be caught by client-side validation earlier
-        // If an item's new billQuantity > current actual stock, it's an issue.
-        throw new Error(`Insufficient stock for product ${productSnap.data().name} after update. New calculated stock would be ${newStock}.`);
-      }
-      productRefsToUpdate.push({ ref: productRef, newStock });
-    } else {
-      // If a product was in the original order but is now deleted, its stock can't be "returned".
-      // If a new product ID is in the updated order that doesn't exist, this is also an error.
-      console.warn(`Product with ID ${productId} not found during stock adjustment for order update.`);
-    }
+          if (newStock < 0) {
+            throw new Error(`Insufficient stock for product ${productSnap.data().name || productId} after update. Calculated stock would be ${newStock}. Current DB stock: ${currentStock}, Net change attempted: ${netChange}.`);
+          }
+          batch.update(productRef, { quantity: newStock, updatedAt: serverTimestamp() });
+        } else {
+          if (netChange < 0) { 
+             throw new Error(`Product with ID ${productId} not found, cannot decrement stock for non-existent product.`);
+          }
+          console.warn(`Product with ID ${productId} not found during stock adjustment for order update (netChange: ${netChange}). Stock not 'returned' as product doc is missing.`);
+        }
+      }).catch(error => {
+        // Catch errors from getDoc or inside .then() for individual product processing
+        console.error(`Error processing stock for product ${productId}:`, error);
+        throw error; // Re-throw to stop the batch if a critical error occurs (like insufficient stock)
+      })
+    );
   }
-  
-  // Add product stock updates to the batch
-  productRefsToUpdate.forEach(p => {
-    batch.update(p.ref, { quantity: p.newStock, updatedAt: serverTimestamp() });
-  });
 
-  // Update the order document itself
-  // Keep original orderNumber and orderDate. Update customer details, items, totals, and updatedAt.
+  // Wait for all product stock fetches and validations to complete
+  await Promise.all(productUpdatePromises);
+
+  // 4. Update the order document itself
   const finalOrderUpdatePayload = {
-    ...updatedOrderPayload, // This includes new items, customer details, totals
+    ...updatedOrderPayload, // This includes new items, customer details, totals from client
     updatedAt: serverTimestamp(),
-    // Ensure orderNumber and orderDate are not overwritten if they are part of updatedOrderPayload by mistake
-    orderNumber: originalOrder.orderNumber,
-    orderDate: originalOrder.orderDate, 
+    orderNumber: originalOrder.orderNumber, // Preserve original order number
+    orderDate: originalOrder.orderDate,     // Preserve original order date
   };
   batch.update(orderRef, finalOrderUpdatePayload);
 

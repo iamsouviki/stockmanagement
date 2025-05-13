@@ -84,7 +84,7 @@ export default function BillingPageContent() {
                 id: item.productId,
                 name: productDetails?.name || item.name,
                 price: productDetails?.price || item.price,
-                quantity: productDetails?.quantity ?? 0, // Actual current stock
+                quantity: productDetails?.quantity ?? 0, 
                 billQuantity: item.billQuantity,
                 categoryId: productDetails?.categoryId ?? '',
                 serialNumber: item.serialNumber || productDetails?.serialNumber || '',
@@ -115,6 +115,9 @@ export default function BillingPageContent() {
         setIsLoadingOrderData(false);
       };
       loadOrderData();
+    } else if (!fromOrderId) {
+      // Clear originalOrderForEdit if navigating to /billing without fromOrder (i.e., for a new bill)
+      setOriginalOrderForEdit(null);
     }
   }, [fromOrderId, availableProducts, router, intent, toast]);
 
@@ -136,16 +139,9 @@ export default function BillingPageContent() {
     const existingItem = billItems.find((item) => item.id === productToAdd.id);
     const currentBillQuantity = existingItem ? existingItem.billQuantity : 0;
     
-    // Stock available for this item to be added/increased in the bill
     let stockAvailableForThisItem = productToAdd.quantity;
 
-    // If editing an order, the stock already allocated to this item in the original order
-    // is "notionally" available again IF this item is the one being modified.
-    // However, the new bill quantity must still respect the current actual DB stock.
-    // The `updateOrderAndAdjustStock` will handle the net change.
-    // The main constraint is that the new `billQuantity` for any item cannot exceed `productToAdd.quantity`.
-
-    if (productToAdd.quantity <= 0 && !existingItem) { // Product completely out of stock and not in bill
+    if (productToAdd.quantity <= 0 && !existingItem) { 
          toast({
            title: "Out of Stock",
            description: `Product "${productToAdd.name}" is out of stock.`,
@@ -154,7 +150,7 @@ export default function BillingPageContent() {
          return;
     }
     if (existingItem) {
-      if (currentBillQuantity < productToAdd.quantity) { // Can increment if current bill qty is less than actual stock
+      if (currentBillQuantity < productToAdd.quantity) { 
         setBillItems(
           billItems.map((item) =>
             item.id === productToAdd.id
@@ -169,10 +165,10 @@ export default function BillingPageContent() {
           variant: "destructive",
         });
       }
-    } else { // New item to add to bill
+    } else { 
       if (productToAdd.quantity > 0) {
         setBillItems([...billItems, { ...productToAdd, billQuantity: 1 }]);
-      } else { // Should be caught by earlier check, but defensive
+      } else { 
          toast({ 
            title: "Out of Stock",
            description: `Product "${productToAdd.name}" is out of stock.`,
@@ -195,7 +191,6 @@ export default function BillingPageContent() {
       return;
     }
     
-    // Actual current stock from DB
     const currentDBStock = productInStock.quantity;
 
     if (newQuantity > currentDBStock) {
@@ -313,28 +308,21 @@ export default function BillingPageContent() {
 
     let customerForOrder: Customer | null = selectedCustomer;
 
-    if (!customerForOrder && intent !== 'edit') { // For new bills or re-created bills (treated as new)
-        if (!searchedMobileForNotFound) { // And no mobile was searched (meaning walk-in is intended)
+    if (!customerForOrder && intent !== 'edit') { 
+        if (!searchedMobileForNotFound) { 
             toast({
                 title: "Customer Not Selected",
                 description: "Please search for a customer, add a new one, or finalize as walk-in if no mobile is entered.",
                 variant: "destructive",
             });
-            // Allow proceeding for walk-in if no mobile provided
-            // If a mobile was searched but not found, it's fine, it will be a walk-in with that mobile
         }
     } else if (!customerForOrder && intent === 'edit' && originalOrderForEdit) {
-        // If editing, and no new customer selected, use original order's customer details
         customerForOrder = {
             id: originalOrderForEdit.customerId,
             name: originalOrderForEdit.customerName,
             mobileNumber: originalOrderForEdit.customerMobile,
             address: originalOrderForEdit.customerAddress || undefined,
-            // Other fields might be undefined if not stored/relevant for this temp object
         };
-    } else if (!customerForOrder && !searchedMobileForNotFound) {
-        // This is the specific case for "Finalize as walk-in" if no interaction with customer search happened.
-        // Handled by allowing proceed.
     }
 
 
@@ -354,10 +342,8 @@ export default function BillingPageContent() {
       barcode: item.barcode || null,
     }));
 
-    // Determine customer details for the order
     const customerId = customerForOrder?.id || WALK_IN_CUSTOMER_ID;
     const customerName = customerForOrder?.name || "Walk-in Customer";
-    // Use selected customer's mobile, or the mobile searched (even if not found), or "N/A"
     const customerMobile = customerForOrder?.mobileNumber || searchedMobileForNotFound || "N/A";
     const customerAddress = customerForOrder?.address || null;
 
@@ -379,7 +365,6 @@ export default function BillingPageContent() {
 
 
       if (intent === 'edit' && fromOrderId && originalOrderForEdit) {
-        // This is an update to an existing order
         orderIdForResult = await updateOrderAndAdjustStock(fromOrderId, orderPayload);
          toast({
           title: "Order Updated!",
@@ -388,13 +373,12 @@ export default function BillingPageContent() {
           duration: 7000,
         });
       } else {
-        // This covers both new bills and "re-create bill" (which is essentially a new bill from old items)
         const itemsToDecrementStock = billItems.map(item => ({
           productId: item.id,
           quantity: item.billQuantity,
         }));
         orderIdForResult = await addOrderAndDecrementStock(orderPayload, itemsToDecrementStock);
-        const tempNewOrder = await getOrderById(orderIdForResult); // to get the generated orderNumber
+        const tempNewOrder = await getOrderById(orderIdForResult); 
         orderNumberForResult = tempNewOrder?.orderNumber;
         toast({
           title: "Bill Finalized!",
@@ -413,13 +397,13 @@ export default function BillingPageContent() {
       
       setBillItems([]);
       handleClearCustomer();
-      setOriginalOrderForEdit(null); // Clear original order after processing
-      fetchProductData(); // Refresh product stock display
+      setOriginalOrderForEdit(null); 
+      fetchProductData(); 
 
       if (intent === 'edit' && fromOrderId) {
-        router.push(`/orders/${fromOrderId}`); // Navigate to updated order detail
+        router.push(`/orders/${fromOrderId}`); 
       } else {
-        router.replace('/billing'); // Clear query params for new/re-created bill
+        router.replace('/billing'); 
       }
 
     } catch (error: any) {
