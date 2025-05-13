@@ -184,19 +184,19 @@ export const addOrderAndDecrementStock = async (
 
 export const updateOrderAndAdjustStock = async (
   orderId: string,
-  updatedOrderPayload: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'>
+  updatedOrderPayload: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'>,
+  originalOrder: Order // Pass the original order to calculate stock differences
 ): Promise<string> => {
   const batch = writeBatch(db);
   const orderRef = doc(db, 'orders', orderId);
 
-  const originalOrder = await getOrder(orderId);
-  if (!originalOrder) {
-    throw new Error(`Order with ID ${orderId} not found for update.`);
-  }
+  // if (!originalOrder) { // originalOrder is now passed as a parameter
+  //   throw new Error(`Original order with ID ${orderId} not found for update.`);
+  // }
 
-  const stockAdjustments = new Map<string, number>(); // productId -> netStockChange
+  const stockAdjustments = new Map<string, number>(); // productId -> netStockChange (positive to add to stock, negative to remove)
 
-  // 1. Calculate stock to be "returned" from original items based on their billQuantity
+  // 1. Calculate stock to be "returned" from original items
   originalOrder.items.forEach(originalItem => {
     stockAdjustments.set(
       originalItem.productId,
@@ -204,7 +204,7 @@ export const updateOrderAndAdjustStock = async (
     );
   });
 
-  // 2. Calculate stock to be "taken" for updated items based on their billQuantity
+  // 2. Calculate stock to be "taken" for updated items
   updatedOrderPayload.items.forEach(updatedItem => {
     stockAdjustments.set(
       updatedItem.productId,
@@ -212,11 +212,11 @@ export const updateOrderAndAdjustStock = async (
     );
   });
   
-  // 3. Prepare product stock updates after fetching current stock for validation
+  // 3. Prepare product stock updates
   const productUpdatePromises: Promise<void>[] = [];
 
   for (const [productId, netChange] of stockAdjustments.entries()) {
-    if (netChange === 0) continue; 
+    if (netChange === 0) continue; // No change for this product
 
     const productRef = doc(db, 'products', productId);
     productUpdatePromises.push(
@@ -226,19 +226,21 @@ export const updateOrderAndAdjustStock = async (
           const newStock = currentStock + netChange; 
 
           if (newStock < 0) {
-            throw new Error(`Insufficient stock for product ${productSnap.data().name || productId} after update. Calculated stock would be ${newStock}. Current DB stock: ${currentStock}, Net change attempted: ${netChange}.`);
+            // This check is critical
+            throw new Error(`Insufficient stock for product ${productSnap.data().name || productId} after update. Required: ${-netChange}, Available (after returning original): ${currentStock + (originalOrder.items.find(i => i.productId === productId)?.billQuantity || 0) }.`);
           }
           batch.update(productRef, { quantity: newStock, updatedAt: serverTimestamp() });
         } else {
-          if (netChange < 0) { 
-             throw new Error(`Product with ID ${productId} not found, cannot decrement stock for non-existent product.`);
+          // Handle if product was deleted between order creation and edit
+          if (netChange < 0) { // Trying to take stock for a product that doesn't exist
+             throw new Error(`Product with ID ${productId} not found, cannot decrement stock for non-existent product during order update.`);
           }
-          console.warn(`Product with ID ${productId} not found during stock adjustment for order update (netChange: ${netChange}). Stock not 'returned' as product doc is missing.`);
+          // If netChange > 0, means returning stock to a non-existent product, which is a data integrity issue but less critical than going negative.
+          console.warn(`Product with ID ${productId} not found during stock adjustment for order update (netChange: ${netChange}). Stock not adjusted as product doc is missing.`);
         }
       }).catch(error => {
-        // Catch errors from getDoc or inside .then() for individual product processing
         console.error(`Error processing stock for product ${productId}:`, error);
-        throw error; // Re-throw to stop the batch if a critical error occurs (like insufficient stock)
+        throw error; 
       })
     );
   }
@@ -252,9 +254,11 @@ export const updateOrderAndAdjustStock = async (
     updatedAt: serverTimestamp(),
     orderNumber: originalOrder.orderNumber, // Preserve original order number
     orderDate: originalOrder.orderDate,     // Preserve original order date
+    // createdAt is inherently preserved on update
   };
   batch.update(orderRef, finalOrderUpdatePayload);
 
   await batch.commit();
   return orderId;
 };
+

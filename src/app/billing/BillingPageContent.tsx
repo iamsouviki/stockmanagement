@@ -141,6 +141,14 @@ export default function BillingPageContent() {
     
     let stockAvailableForThisItem = productToAdd.quantity;
 
+    if (intent === 'edit' && originalOrderForEdit) {
+      const originalItemInOrder = originalOrderForEdit.items.find(item => item.productId === productToAdd.id);
+      if (originalItemInOrder) {
+        stockAvailableForThisItem += originalItemInOrder.billQuantity; 
+      }
+    }
+
+
     if (productToAdd.quantity <= 0 && !existingItem) { 
          toast({
            title: "Out of Stock",
@@ -150,7 +158,7 @@ export default function BillingPageContent() {
          return;
     }
     if (existingItem) {
-      if (currentBillQuantity < productToAdd.quantity) { 
+      if (currentBillQuantity < stockAvailableForThisItem) { 
         setBillItems(
           billItems.map((item) =>
             item.id === productToAdd.id
@@ -161,12 +169,12 @@ export default function BillingPageContent() {
       } else {
         toast({
           title: "Max Stock Reached",
-          description: `Cannot add more of "${productToAdd.name}". Available in stock: ${productToAdd.quantity}.`,
+          description: `Cannot add more of "${productToAdd.name}". Available (including original order): ${stockAvailableForThisItem}. In current DB: ${productToAdd.quantity}`,
           variant: "destructive",
         });
       }
     } else { 
-      if (productToAdd.quantity > 0) {
+      if (productToAdd.quantity > 0 || (intent === 'edit' && stockAvailableForThisItem > 0)) { // Ensure positive stock if adding new
         setBillItems([...billItems, { ...productToAdd, billQuantity: 1 }]);
       } else { 
          toast({ 
@@ -191,12 +199,20 @@ export default function BillingPageContent() {
       return;
     }
     
-    const currentDBStock = productInStock.quantity;
+    let currentDBStock = productInStock.quantity;
+
+    if (intent === 'edit' && originalOrderForEdit) {
+      const originalItemInOrder = originalOrderForEdit.items.find(item => item.productId === itemId);
+      if (originalItemInOrder) {
+        currentDBStock += originalItemInOrder.billQuantity;
+      }
+    }
+
 
     if (newQuantity > currentDBStock) {
       toast({
         title: "Stock Limit Exceeded",
-        description: `Cannot set quantity for "${productInStock.name}" to ${newQuantity}. Max stock available: ${currentDBStock}.`,
+        description: `Cannot set quantity for "${productInStock.name}" to ${newQuantity}. Max stock available (incl. original order): ${currentDBStock}. In current DB: ${productInStock.quantity}.`,
         variant: "destructive",
       });
       setBillItems(
@@ -308,15 +324,17 @@ export default function BillingPageContent() {
 
     let customerForOrder: Customer | null = selectedCustomer;
 
-    if (!customerForOrder && intent !== 'edit') { 
-        if (!searchedMobileForNotFound) { 
-            toast({
-                title: "Customer Not Selected",
-                description: "Please search for a customer, add a new one, or finalize as walk-in if no mobile is entered.",
-                variant: "destructive",
-            });
-        }
-    } else if (!customerForOrder && intent === 'edit' && originalOrderForEdit) {
+    // If not editing, and no customer is selected, prompt.
+    // If editing, originalOrderForEdit holds the customer if one wasn't re-selected.
+    if (intent !== 'edit' && !customerForOrder && !searchedMobileForNotFound) { 
+        toast({
+            title: "Customer Not Selected",
+            description: "Please search for a customer, add a new one, or finalize as walk-in if no mobile is entered.",
+            variant: "destructive",
+        });
+        return; // Important to return here
+    } else if (intent === 'edit' && !customerForOrder && originalOrderForEdit) {
+        // If editing and customer was cleared but not re-selected, use original customer for the order.
         customerForOrder = {
             id: originalOrderForEdit.customerId,
             name: originalOrderForEdit.customerName,
@@ -365,7 +383,7 @@ export default function BillingPageContent() {
 
 
       if (intent === 'edit' && fromOrderId && originalOrderForEdit) {
-        orderIdForResult = await updateOrderAndAdjustStock(fromOrderId, orderPayload);
+        orderIdForResult = await updateOrderAndAdjustStock(fromOrderId, orderPayload, originalOrderForEdit);
          toast({
           title: "Order Updated!",
           description: `Order ${orderNumberForResult || orderIdForResult} has been successfully updated. PDF is opening for print.`,
@@ -531,3 +549,4 @@ export default function BillingPageContent() {
     </div>
   );
 }
+
