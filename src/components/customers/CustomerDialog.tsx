@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import {
@@ -16,8 +15,8 @@ interface CustomerDialogProps {
   onOpenChange: (isOpen: boolean) => void;
   customer?: Customer | null; 
   onSubmit: (data: CustomerFormData) => void;
-  existingMobileNumbers?: string[]; // For validation, though async validation in form/parent is better
-  initialMobileNumber?: string; // To pre-fill mobile number for new customer
+  existingMobileNumbers?: string[]; 
+  initialMobileNumber?: string; 
 }
 
 const CustomerDialog: React.FC<CustomerDialogProps> = ({
@@ -25,14 +24,11 @@ const CustomerDialog: React.FC<CustomerDialogProps> = ({
   onOpenChange,
   customer,
   onSubmit,
-  existingMobileNumbers, // This prop is less effective with async validation within the parent or form.
+  // existingMobileNumbers, // This prop is less effective with async validation within the parent or form.
   initialMobileNumber,
 }) => {
-  // The onSubmit function passed from the parent (e.g., CustomersPage or BillingPage)
-  // should handle the actual submission logic, including async validation and toast messages.
   const handleSubmit = (data: CustomerFormData) => {
     onSubmit(data);
-    // Parent component is responsible for closing the dialog on successful submission.
   };
 
   return (
@@ -52,7 +48,7 @@ const CustomerDialog: React.FC<CustomerDialogProps> = ({
           customer={customer}
           onSubmit={handleSubmit}
           onCancel={() => onOpenChange(false)}
-          initialMobileNumber={initialMobileNumber} // Pass down to form
+          initialMobileNumber={initialMobileNumber} 
         />
       </DialogContent>
     </Dialog>

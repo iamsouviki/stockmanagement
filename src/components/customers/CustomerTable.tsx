@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import Image from 'next/image';
@@ -27,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import React, { useState } from "react";
+import React from "react"; // Removed useState as it's not used directly here
 
 interface CustomerTableProps {
   customers: Customer[];
@@ -48,11 +47,11 @@ const CustomerTable: React.FC<CustomerTableProps> = ({ customers, onEdit, onDele
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search by mobile number..."
+              placeholder="Search by mobile number or name..."
               value={searchTerm}
               onChange={(e) => onSearchTermChange(e.target.value)}
               className="pl-10 w-full sm:w-72"
-              aria-label="Search customers by mobile number"
+              aria-label="Search customers by mobile number or name"
             />
           </div>
       </CardHeader>
@@ -98,7 +97,7 @@ const CustomerTable: React.FC<CustomerTableProps> = ({ customers, onEdit, onDele
                     <TableCell className="font-medium">{customer.name}</TableCell>
                     <TableCell>{customer.mobileNumber}</TableCell>
                     <TableCell>{customer.email || '-'}</TableCell>
-                    <TableCell className="max-w-[200px] truncate" title={customer.address}>
+                    <TableCell className="max-w-[200px] truncate" title={customer.address || undefined}>
                         {customer.address || '-'}
                     </TableCell>
                     <TableCell className="text-center">

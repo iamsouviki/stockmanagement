@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -24,7 +23,7 @@ const customerSchema = z.object({
     .min(10, "Mobile number must be at least 10 characters.")
     .regex(/^[+]?[0-9\s-()]{10,}$/, "Invalid mobile number format. Use digits, spaces, hyphens, or parentheses."),
   email: z.string().email("Invalid email address.").optional().or(z.literal("")),
-  address: z.string().optional(),
+  address: z.string().optional().or(z.literal("")), // Allow empty string for optional address
 });
 
 export type CustomerFormData = z.infer<typeof customerSchema>;
@@ -48,29 +47,29 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSubmit, onCance
         }
       : {
           name: "",
-          mobileNumber: initialMobileNumber || "", // Pre-fill if adding new and initialMobileNumber is provided
+          mobileNumber: initialMobileNumber || "", 
           email: "",
           address: "",
         },
   });
 
   useEffect(() => {
-    if (!customer && initialMobileNumber) {
-      form.reset({
-        name: "",
-        mobileNumber: initialMobileNumber,
-        email: "",
-        address: "",
-      });
-    } else if (customer) {
+    if (customer) {
       form.reset({
         name: customer.name,
         mobileNumber: customer.mobileNumber,
         email: customer.email || "",
         address: customer.address || "",
       });
+    } else {
+      form.reset({
+        name: "",
+        mobileNumber: initialMobileNumber || "",
+        email: "",
+        address: "",
+      });
     }
-  }, [customer, initialMobileNumber, form]);
+  }, [customer, initialMobileNumber, form.reset]);
 
 
   return (

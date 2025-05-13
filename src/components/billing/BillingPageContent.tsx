@@ -293,10 +293,16 @@ export default function BillingPageContent() {
       barcode: item.barcode || null,
     }));
 
+    // These values will be non-null strings due to the logic in addOrderAndDecrementStock
+    const customerName = selectedCustomer?.name || "Walk-in Customer";
+    const customerMobile = selectedCustomer?.mobileNumber || "N/A";
+    const customerAddress = selectedCustomer?.address || null;
+
     const orderData: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'> = {
       customerId: selectedCustomer?.id || WALK_IN_CUSTOMER_ID,
-      customerName: selectedCustomer?.name || "Walk-in Customer",
-      customerMobile: selectedCustomer?.mobileNumber || "N/A",
+      customerName: customerName,
+      customerMobile: customerMobile,
+      customerAddress: customerAddress, 
       items: orderItems,
       subtotal,
       taxAmount,
@@ -310,12 +316,12 @@ export default function BillingPageContent() {
 
     try {
       const newOrderId = await addOrderAndDecrementStock(orderData, itemsToDecrementStock);
-      const newOrder = await getOrderById(newOrderId); // Fetch the complete order with server timestamps
+      const newOrder = await getOrderById(newOrderId); 
       if (!newOrder) {
         throw new Error("Failed to retrieve the newly created order for PDF generation.");
       }
 
-      generateInvoicePdf(newOrder, storeDetails); // Use the utility
+      generateInvoicePdf(newOrder, storeDetails); 
 
       toast({
         title: "Bill Sent for Printing!",
@@ -324,8 +330,8 @@ export default function BillingPageContent() {
       });
       setBillItems([]);
       handleClearCustomer();
-      fetchProductData(); // Refresh product stock
-      if (fromOrderId) router.replace('/billing'); // Clear fromOrder query param
+      fetchProductData(); 
+      if (fromOrderId) router.replace('/billing'); 
     } catch (error) {
       console.error("Error finalizing bill:", error);
       toast({
@@ -361,6 +367,7 @@ export default function BillingPageContent() {
               <div>
                 <p className="font-semibold">{selectedCustomer.name}</p>
                 <p className="text-sm text-muted-foreground">{selectedCustomer.mobileNumber}</p>
+                 {selectedCustomer.address && <p className="text-xs text-muted-foreground mt-1">{selectedCustomer.address}</p>}
               </div>
               <Button variant="outline" size="sm" onClick={handleClearCustomer}>Change</Button>
             </div>
@@ -388,6 +395,7 @@ export default function BillingPageContent() {
                   {foundCustomers.map(cust => (
                     <li key={cust.id} className="p-2 hover:bg-muted cursor-pointer border-b last:border-b-0" onClick={() => handleSelectCustomer(cust)}>
                       {cust.name} - {cust.mobileNumber}
+                      {cust.address && <span className="text-xs block text-muted-foreground">{cust.address}</span>}
                     </li>
                   ))}
                 </ul>
@@ -440,3 +448,4 @@ export default function BillingPageContent() {
     </div>
   );
 }
+

@@ -86,6 +86,7 @@ export default function OrderDetailPage() {
           <CardContent className="space-y-2">
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-full" />
           </CardContent>
         </Card>
         <Card>
@@ -121,8 +122,9 @@ export default function OrderDetailPage() {
         <CardContent className="space-y-4">
           <div>
             <h3 className="font-semibold text-lg">Customer Information</h3>
-            <p>Name: {order.customerName || 'N/A'}</p>
-            <p>Mobile: {order.customerMobile || 'N/A'}</p>
+            <p>Name: {order.customerName}</p>
+            <p>Mobile: {order.customerMobile}</p>
+            <p>Address: {order.customerAddress || 'N/A'}</p>
           </div>
           <div>
             <h3 className="font-semibold text-lg">Items Ordered</h3>
@@ -190,3 +192,4 @@ export default function OrderDetailPage() {
     </div>
   );
 }
+

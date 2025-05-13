@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import Image from 'next/image';
@@ -14,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Pencil, Trash2, Tag } from "lucide-react"; 
-import Logo from '@/components/icons/Logo'; // Import Logo
+import Logo from '@/components/icons/Logo'; 
 import {
   AlertDialog,
   AlertDialogAction,

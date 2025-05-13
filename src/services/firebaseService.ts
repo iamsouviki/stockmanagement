@@ -103,31 +103,31 @@ export const addOrderAndDecrementStock = async (
 ): Promise<string> => {
   const batch = writeBatch(db);
 
-  // 1. Generate Order Number and set Order Date
   const now = new Date();
   const orderNumber = `ORD-${format(now, 'yyyyMMdd-HHmmssSSS')}`;
   
-  // Ensure customerId is always set, using WALK_IN_CUSTOMER_ID if necessary
-  const finalCustomerId = orderData.customerId || WALK_IN_CUSTOMER_ID;
-  const finalCustomerName = orderData.customerName || (finalCustomerId === WALK_IN_CUSTOMER_ID ? "Walk-in Customer" : null);
-  const finalCustomerMobile = orderData.customerMobile || (finalCustomerId === WALK_IN_CUSTOMER_ID ? "N/A" : null);
+  // Resolve customer details, ensuring defaults for walk-in or missing info
+  // These values are guaranteed to be strings by the Order type after this resolution.
+  const customerId = orderData.customerId || WALK_IN_CUSTOMER_ID;
+  const customerName = orderData.customerName || (customerId === WALK_IN_CUSTOMER_ID ? "Walk-in Customer" : "Unknown Customer");
+  const customerMobile = orderData.customerMobile || (customerId === WALK_IN_CUSTOMER_ID ? "N/A" : "N/A");
+  const customerAddress = orderData.customerAddress || null; // Default to null if not provided
 
-  const newOrderDataWithTimestamp = {
-    ...orderData,
-    customerId: finalCustomerId,
-    customerName: finalCustomerName,
-    customerMobile: finalCustomerMobile,
+  const completeOrderData: Omit<Order, 'id'> = { // Data to be written to Firestore
+    ...orderData, // Spread incoming data first
     orderNumber,
+    customerId, 
+    customerName,
+    customerMobile,
+    customerAddress,
     orderDate: Timestamp.fromDate(now),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+    createdAt: serverTimestamp() as Timestamp,
+    updatedAt: serverTimestamp() as Timestamp,
   };
 
-  // 2. Create a new order document reference
   const newOrderRef = doc(collection(db, 'orders'));
-  batch.set(newOrderRef, newOrderDataWithTimestamp);
+  batch.set(newOrderRef, completeOrderData);
 
-  // 3. Decrement stock for each product
   for (const item of itemsToDecrement) {
     const productRef = doc(db, 'products', item.productId);
     const productSnap = await getDoc(productRef);
@@ -140,7 +140,7 @@ export const addOrderAndDecrementStock = async (
     }
   }
 
-  // 4. Commit the batch
   await batch.commit();
   return newOrderRef.id;
 };
+

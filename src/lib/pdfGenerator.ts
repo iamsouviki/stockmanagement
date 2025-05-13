@@ -3,7 +3,7 @@ import jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import type { Order, StoreDetails } from '@/types';
 import { Timestamp } from 'firebase/firestore';
-import { WALK_IN_CUSTOMER_ID } from '@/types';
+// import { WALK_IN_CUSTOMER_ID } from '@/types'; // Not directly needed here as order object has resolved names
 
 function formatDateForPdf(dateValue: Timestamp | string | Date | undefined) {
   if (!dateValue) return 'N/A';
@@ -68,11 +68,34 @@ export function generateInvoicePdf(
   doc.text(`Date: ${formatDateForPdf(order.orderDate)}`, pageWidth - margin, yPos, { align: 'right' });
   yPos += 6;
 
-  const customerIdentifier = order.customerId === WALK_IN_CUSTOMER_ID || !order.customerName
-    ? 'Walk-in Customer'
-    : `${order.customerName} (${order.customerMobile || 'N/A'})`;
-  doc.text(`Customer: ${customerIdentifier}`, margin, yPos);
-  yPos += 8; 
+  // Customer Name and Mobile
+  doc.text(`Customer: ${order.customerName}`, margin, yPos);
+  const customerMobileText = `Mobile: ${order.customerMobile}`;
+  
+  // Attempt to place mobile next to name if space allows
+  const customerNameWidth = doc.getTextWidth(`Customer: ${order.customerName}`);
+  const mobileTextWidth = doc.getTextWidth(customerMobileText);
+  const availableSpaceForMobile = pageWidth - (margin * 2) - customerNameWidth - 5; // 5 for padding
+
+  if (mobileTextWidth < availableSpaceForMobile) {
+    doc.text(customerMobileText, margin + customerNameWidth + 5, yPos);
+  } else { // If not enough space, put mobile on new line
+    yPos += 6;
+    doc.text(customerMobileText, margin, yPos);
+  }
+  yPos += 6;
+
+
+  // Customer Address (if available)
+  if (order.customerAddress) {
+    const addressLines = doc.splitTextToSize(`Address: ${order.customerAddress}`, pageWidth - (margin * 2));
+    doc.text(addressLines, margin, yPos);
+    yPos += (addressLines.length * (doc.getLineHeight('helvetica', 'normal', 10) / doc.internal.scaleFactor)) + 2; // +2 for padding
+  } else {
+    doc.text(`Address: N/A`, margin, yPos);
+    yPos += 6;
+  }
+  yPos += 2; // Extra space before table
 
   // Column definitions
   const paddingBetweenCols = 5;
@@ -87,45 +110,38 @@ export function generateInvoicePdf(
     snBarcode: margin + productColWidth + paddingBetweenCols,
     qty: margin + productColWidth + paddingBetweenCols + snBarcodeColWidth + paddingBetweenCols,
     price: margin + productColWidth + paddingBetweenCols + snBarcodeColWidth + paddingBetweenCols + qtyColWidth + paddingBetweenCols,
-    subtotal: margin + productColWidth + paddingBetweenCols + snBarcodeColWidth + paddingBetweenCols + qtyColWidth + paddingBetweenCols + priceColWidth + paddingBetweenCols
+    subtotal: pageWidth - margin // Subtotal will be right aligned to page margin
   };
   
-  // Table Headers
-  doc.setLineWidth(0.2);
-  doc.line(margin, yPos, pageWidth - margin, yPos); // Line above table headers
-  yPos += 5; // Padding before header text
+  const drawTableHeaders = () => {
+    doc.setLineWidth(0.2);
+    doc.line(margin, yPos, pageWidth - margin, yPos); 
+    yPos += 5; 
 
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
 
-  doc.text('Product Name', colStartX.productName, yPos);
-  doc.text('SN/Barcode', colStartX.snBarcode, yPos);
-  doc.text('Qty', colStartX.qty + qtyColWidth, yPos, { align: 'right' });
-  doc.text('Price', colStartX.price + priceColWidth, yPos, { align: 'right' });
-  doc.text('Subtotal', pageWidth - margin, yPos, { align: 'right' }); 
-  
-  // Increment yPos by the height of the header text line
-  yPos += (doc.getLineHeight() / doc.internal.scaleFactor); 
-  
-  yPos += 2; // Padding after header text
-  doc.line(margin, yPos, pageWidth - margin, yPos); // Line below table headers
-  yPos += 4; // Space before first item
+    doc.text('Product Name', colStartX.productName, yPos);
+    doc.text('SN/Barcode', colStartX.snBarcode, yPos);
+    doc.text('Qty', colStartX.qty + qtyColWidth, yPos, { align: 'right' });
+    doc.text('Price', colStartX.price + priceColWidth, yPos, { align: 'right' });
+    doc.text('Subtotal', colStartX.subtotal, yPos, { align: 'right' }); 
+    
+    yPos += (doc.getLineHeight('helvetica', 'bold', 10) / doc.internal.scaleFactor); 
+    yPos += 2; 
+    doc.line(margin, yPos, pageWidth - margin, yPos); 
+    yPos += 4; 
+    doc.setFont('helvetica', 'normal'); // Reset font for items
+  };
+
+  drawTableHeaders();
 
   // Table Items
-  doc.setFont('helvetica', 'normal');
   order.items.forEach((item) => {
-    if (yPos > pageHeight - 45) { 
+    if (yPos > pageHeight - 45) { // Check for page break
       doc.addPage();
       yPos = margin;
-      // Optionally redraw headers (can be complex; for now, just reset yPos)
-      // To redraw headers:
-      // doc.setLineWidth(0.2);
-      // doc.line(margin, yPos, pageWidth - margin, yPos); yPos += 5;
-      // doc.setFontSize(10); doc.setFont('helvetica', 'bold');
-      // doc.text('Product Name', colStartX.productName, yPos); /* ... other headers ... */
-      // yPos += (doc.getLineHeight() / doc.internal.scaleFactor); yPos += 2;
-      // doc.line(margin, yPos, pageWidth - margin, yPos); yPos += 4;
-      // doc.setFont('helvetica', 'normal'); // Reset font for items
+      drawTableHeaders(); // Redraw headers on new page
     }
     const itemSubtotal = item.price * item.billQuantity;
 
@@ -138,11 +154,11 @@ export function generateInvoicePdf(
 
     doc.text(item.billQuantity.toString(), colStartX.qty + qtyColWidth, yPos, { align: 'right' });
     doc.text(`₹${item.price.toFixed(2)}`, colStartX.price + priceColWidth, yPos, { align: 'right' });
-    doc.text(`₹${itemSubtotal.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
+    doc.text(`₹${itemSubtotal.toFixed(2)}`, colStartX.subtotal, yPos, { align: 'right' });
     
-    const lineCount = Math.max(productNameLines.length, snBarcodeLines.length, 1); // Ensure at least 1 line for height calculation
-    const textBlockHeight = lineCount * (doc.getLineHeight() / doc.internal.scaleFactor);
-    yPos += textBlockHeight + 3; // Add padding below item row
+    const lineCount = Math.max(productNameLines.length, snBarcodeLines.length, 1); 
+    const textBlockHeight = lineCount * (doc.getLineHeight('helvetica', 'normal', 10) / doc.internal.scaleFactor);
+    yPos += textBlockHeight + 3; 
   });
 
   // Summary Section
@@ -176,3 +192,4 @@ export function generateInvoicePdf(
   doc.autoPrint({variant: 'non-conform'});
   doc.output('dataurlnewwindow', { filename: `StockPilot-Bill-${order.orderNumber}.pdf` });
 }
+

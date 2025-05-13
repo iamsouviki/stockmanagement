@@ -36,9 +36,10 @@ export interface OrderItemData {
 export interface Order {
   id: string; // Firebase document ID
   orderNumber: string; // Human-readable, e.g., YYYYMMDD-HHMMSS
-  customerId: string; // Made non-optional. Use a placeholder for walk-in customers.
-  customerName?: string | null; // Denormalized from Customer record
-  customerMobile?: string | null; // Denormalized
+  customerId: string; // Use a placeholder for walk-in customers.
+  customerName: string; // Denormalized from Customer record or "Walk-in Customer"
+  customerMobile: string; // Denormalized or "N/A"
+  customerAddress?: string | null; // Denormalized or null/N/A
   items: OrderItemData[];
   subtotal: number;
   taxAmount: number;
@@ -75,3 +76,4 @@ export interface StoreDetails {
 }
 
 export const WALK_IN_CUSTOMER_ID = "WALK_IN_CUSTOMER";
+
