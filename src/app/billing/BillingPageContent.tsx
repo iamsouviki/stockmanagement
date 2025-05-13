@@ -315,12 +315,16 @@ export default function BillingPageContent() {
 
   const handleFinalizeBill = async () => {
     setIsFinalizing(true);
-    console.log("handleFinalizeBill - Intent:", intent);
-    console.log("handleFinalizeBill - From Order ID:", fromOrderId);
-    console.log("handleFinalizeBill - Original Order for Edit (exists?):", !!originalOrderForEdit);
+    // These logs are crucial for debugging the edit vs. create path
+    console.log("--- handleFinalizeBill START ---");
+    console.log("Current Intent:", intent);
+    console.log("Current From Order ID:", fromOrderId);
+    console.log("Original Order For Edit (is set?):", !!originalOrderForEdit);
     if (originalOrderForEdit) {
-        console.log("handleFinalizeBill - Original Order ID for Edit:", originalOrderForEdit.id);
+        console.log("Original Order ID for Edit:", originalOrderForEdit.id);
     }
+    console.log("---------------------------------");
+
 
     if (billItems.length === 0) {
       toast({
@@ -330,22 +334,6 @@ export default function BillingPageContent() {
       });
       setIsFinalizing(false);
       return;
-    }
-
-    let customerForOrder: Customer | null = selectedCustomer;
-
-    if (!customerForOrder && !(intent === 'edit' && originalOrderForEdit?.customerId)) {
-      if (!searchedMobileForNotFound) {
-         // Allow walk-in without explicit customer selection for new/re-bills
-      } else { 
-         toast({
-            title: "Customer Not Found",
-            description: `Customer with mobile ${searchedMobileForNotFound} not found. Add them or clear search to proceed as walk-in.`,
-            variant: "destructive",
-         });
-         setIsFinalizing(false);
-         return;
-      }
     }
     
     const subtotal = billItems.reduce((sum, item) => sum + item.price * item.billQuantity, 0);
@@ -374,7 +362,8 @@ export default function BillingPageContent() {
       customerName = selectedCustomer.name;
       customerMobile = selectedCustomer.mobileNumber;
       customerAddress = selectedCustomer.address || null;
-    } else if (intent === 'edit' && originalOrderForEdit) {
+    } else if (intent === 'edit' && originalOrderForEdit && originalOrderForEdit.customerName !== "Walk-in Customer") {
+      // If editing an order that had a specific customer, retain that customer's details if no new customer is selected.
       customerId = originalOrderForEdit.customerId;
       customerName = originalOrderForEdit.customerName;
       customerMobile = originalOrderForEdit.customerMobile;
@@ -397,9 +386,19 @@ export default function BillingPageContent() {
       let orderIdForResult: string;
       let orderNumberForToast: string | undefined;
 
-
-      if (intent === 'edit' && fromOrderId && originalOrderForEdit) {
-        console.log("handleFinalizeBill - Entering UPDATE block in UI");
+      if (intent === 'edit') {
+        if (!fromOrderId || !originalOrderForEdit) {
+          console.error("CRITICAL: Edit intent, but fromOrderId or originalOrderForEdit is missing at the point of service call.", { fromOrderIdPresent: !!fromOrderId, originalOrderForEditPresent: !!originalOrderForEdit });
+          toast({
+            title: "Edit Error",
+            description: "Cannot update order. Original order data is missing or invalid. Please reload and try again.",
+            variant: "destructive",
+            duration: 7000,
+          });
+          setIsFinalizing(false);
+          return;
+        }
+        console.log("Calling updateOrderAndAdjustStock with fromOrderId:", fromOrderId);
         orderIdForResult = await updateOrderAndAdjustStock(fromOrderId, orderPayload, originalOrderForEdit);
         orderNumberForToast = originalOrderForEdit.orderNumber; 
          toast({
@@ -409,7 +408,7 @@ export default function BillingPageContent() {
           duration: 7000,
         });
       } else { 
-        console.log("handleFinalizeBill - Entering CREATE NEW block in UI");
+        console.log("Calling addOrderAndDecrementStock (new order)");
         const itemsToDecrementStock = billItems.map(item => ({
           productId: item.id,
           quantity: item.billQuantity,
@@ -526,7 +525,7 @@ export default function BillingPageContent() {
                   </Button>
                 </div>
               )}
-               {!selectedCustomer && !customerSearchTerm && !searchedMobileForNotFound && !(intent === 'edit' && originalOrderForEdit?.customerId) && (
+               {!selectedCustomer && !customerSearchTerm && !searchedMobileForNotFound && !(intent === 'edit' && originalOrderForEdit?.customerId && originalOrderForEdit.customerName !== "Walk-in Customer" ) && (
                  <Alert variant="default" className="border-primary/50 text-primary bg-primary/5">
                     <Info className="h-5 w-5 !text-primary" />
                     <AlertTitle className="font-semibold">Tip</AlertTitle>
@@ -535,6 +534,15 @@ export default function BillingPageContent() {
                     </AlertDescription>
                 </Alert>
                )}
+                 {intent === 'edit' && originalOrderForEdit?.customerName !== "Walk-in Customer" && !selectedCustomer && (
+                    <Alert variant="default" className="border-accent text-accent bg-accent/10">
+                        <Info className="h-5 w-5 !text-accent" />
+                        <AlertTitle className="font-semibold">Editing Order for: {originalOrderForEdit.customerName}</AlertTitle>
+                        <AlertDescription>
+                        This order was originally for {originalOrderForEdit.customerName} ({originalOrderForEdit.customerMobile}). If you wish to change the customer, search or add a new one above. Otherwise, the original customer details will be retained.
+                        </AlertDescription>
+                    </Alert>
+                )}
             </>
           )}
         </CardContent>
