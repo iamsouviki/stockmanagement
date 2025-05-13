@@ -17,15 +17,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Firebase Auth handles user session persistence by default.
-// - By default, it uses 'local' persistence, meaning the user stays signed in
-//   even after closing the browser, until they explicitly sign out.
-// - ID tokens are short-lived (1 hour) but are automatically refreshed by the SDK
-//   as long as the user's session is active and the refresh token is valid.
-// - This means users "don't have to login every time" and will "stay login for 24 hr" (and much longer)
-//   without needing additional state management libraries like Redux for this specific purpose.
-// - This AuthContext makes the currentUser and userProfile available throughout the app.
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -34,48 +25,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
 
   useEffect(() => {
+    // console.log("AuthProvider: useEffect triggered. Pathname:", pathname);
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setIsLoading(true);
+      // console.log("AuthProvider: onAuthStateChanged fired. User:", user ? user.uid : null);
+      setIsLoading(true); // Set loading true at the start of auth state processing
       if (user) {
         setCurrentUser(user);
         try {
+          // console.log("AuthProvider: Fetching profile for UID:", user.uid);
           const profile = await getUserProfile(user.uid);
+          // console.log("AuthProvider: Profile fetched:", profile);
           setUserProfile(profile);
-          if (!profile && pathname !== '/user-setup' && pathname !== '/login') { 
-            // If profile doesn't exist and not on setup/login, further action might be needed.
-            // For example, redirect to a profile setup page or show an error.
-            // console.warn("User profile not found for UID:", user.uid, "on page:", pathname);
-            // If roles are critical for routing and the profile is null, AuthGuard should handle redirection.
-          }
         } catch (error) {
-          console.error("Error fetching user profile:", error);
+          console.error("AuthProvider: Error fetching user profile:", error);
           setUserProfile(null); 
         }
       } else {
         setCurrentUser(null);
         setUserProfile(null);
       }
-      setIsLoading(false);
+      setIsLoading(false); // Set loading false after all processing
+      // console.log("AuthProvider: isLoading set to false. currentUser:", user ? user.uid : null, "userProfile:", userProfile ? userProfile.role : null);
     });
 
-    return () => unsubscribe();
-  }, [pathname, router]); // Added router to dependencies, though its direct use in this effect is minimal now
+    return () => {
+      // console.log("AuthProvider: Unsubscribing from onAuthStateChanged.");
+      unsubscribe();
+    }
+  }, []); // Removed pathname and router from dependencies; onAuthStateChanged should only run once to set up listener.
 
   const logout = async () => {
-    setIsLoading(true);
+    // console.log("AuthProvider: Logout called.");
+    setIsLoading(true); // Indicate loading during logout
     try {
       await firebaseSignOut(auth);
-      // State will be updated by onAuthStateChanged listener
-      // setCurrentUser(null);
-      // setUserProfile(null);
-      router.push('/login'); // Explicitly redirect to login after sign out
+      // currentUser and userProfile will be set to null by onAuthStateChanged
+      router.push('/login'); 
     } catch (error) {
-      console.error("Error signing out:", error);
-      // Handle error (e.g., show toast)
+      console.error("AuthProvider: Error signing out:", error);
+      toast({ title: "Logout Failed", description: "Could not sign out. Please try again.", variant: "destructive" });
     } finally {
-        // setIsLoading(false); // isLoading will be set to false by onAuthStateChanged
+      // setIsLoading(false); // onAuthStateChanged will handle setting isLoading to false
     }
   };
+  
+  // Add a toast import if you uncomment the toast line above
+  // import { toast } from '@/hooks/use-toast';
+
 
   return (
     <AuthContext.Provider value={{ currentUser, userProfile, isLoading, logout }}>

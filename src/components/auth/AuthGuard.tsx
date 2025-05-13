@@ -3,14 +3,14 @@
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { UserRole } from '@/types';
-import { Skeleton } from '@/components/ui/skeleton'; // For loading state
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface AuthGuardProps {
   children: ReactNode;
   allowedRoles?: UserRole[];
-  redirectPath?: string; // Path to redirect if not authorized/authenticated
+  redirectPath?: string;
 }
 
 const PageSkeleton = () => (
@@ -25,49 +25,68 @@ const PageSkeleton = () => (
   </div>
 );
 
-
 export default function AuthGuard({ children, allowedRoles, redirectPath = '/login' }: AuthGuardProps) {
-  const { currentUser, userProfile, isLoading } = useAuth();
+  const { currentUser, userProfile, isLoading: isAuthLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [isAuthorizedToRender, setIsAuthorizedToRender] = useState(false);
 
   useEffect(() => {
-    if (isLoading) return; // Wait until authentication status is resolved
+    // console.log(`AuthGuard (${pathname}): Effect triggered. AuthLoading: ${isAuthLoading}, CurrentUser: ${!!currentUser}, UserProfile: ${!!userProfile}`);
+    
+    if (isAuthLoading) {
+      // console.log(`AuthGuard (${pathname}): Auth is loading. Setting isAuthorizedToRender to false.`);
+      setIsAuthorizedToRender(false);
+      return;
+    }
 
     if (!currentUser) {
-      // If not authenticated and not already on the redirectPath (login page), redirect
+      // console.log(`AuthGuard (${pathname}): No current user.`);
       if (pathname !== redirectPath) {
+        // console.log(`AuthGuard (${pathname}): Not on redirect path. Redirecting to ${redirectPath}.`);
         router.replace(redirectPath);
+      } else {
+        // console.log(`AuthGuard (${pathname}): On redirect path (${redirectPath}), user not logged in. LoginForm should handle display.`);
+        // If on login page, and no user, login form should be shown by the LoginPage itself.
+        // If children of AuthGuard on login page is LoginForm, this path allows it to render.
+        setIsAuthorizedToRender(true); 
       }
       return;
     }
 
-    // If authenticated, check roles if specified
+    // User is authenticated (currentUser exists)
     if (allowedRoles && allowedRoles.length > 0) {
-      if (!userProfile || !allowedRoles.includes(userProfile.role)) {
-        // If user profile doesn't exist or role is not allowed, redirect to home or an unauthorized page
-        // For simplicity, redirecting to home. A dedicated '/unauthorized' page might be better.
-        console.warn(`User with role '${userProfile?.role}' not authorized for this page. Allowed: ${allowedRoles.join(', ')}`);
-        router.replace('/'); 
+      // console.log(`AuthGuard (${pathname}): Roles required: ${allowedRoles.join(', ')}.`);
+      if (!userProfile) {
+        // console.warn(`AuthGuard (${pathname}): User authenticated but profile is null. Cannot check roles. Redirecting to /.`);
+        if (pathname !== '/') router.replace('/');
+        else setIsAuthorizedToRender(false); // Avoid self-redirect loop if on '/' and profile is missing
+        return;
+      }
+      if (!allowedRoles.includes(userProfile.role)) {
+        // console.warn(`AuthGuard (${pathname}): User role '${userProfile.role}' not in allowed roles: ${allowedRoles.join(', ')}. Redirecting to /.`);
+        if (pathname !== '/') router.replace('/');
+        else setIsAuthorizedToRender(false); // Avoid self-redirect loop
         return;
       }
     }
-    // If authenticated and no specific roles required, or role is allowed, continue
-  }, [currentUser, userProfile, isLoading, router, allowedRoles, redirectPath, pathname]);
+    
+    // console.log(`AuthGuard (${pathname}): Authorization checks passed. Setting isAuthorizedToRender to true.`);
+    setIsAuthorizedToRender(true);
 
-  if (isLoading) {
+  }, [currentUser, userProfile, isAuthLoading, router, allowedRoles, redirectPath, pathname]);
+
+  if (isAuthLoading) {
+    // console.log(`AuthGuard (${pathname}): Rendering PageSkeleton because isAuthLoading is true.`);
     return <PageSkeleton />;
   }
 
-  if (!currentUser && pathname !== redirectPath) {
-    // Still show skeleton or minimal content if redirecting and not on login page
-    return <PageSkeleton />;
-  }
-  
-  if (currentUser && allowedRoles && allowedRoles.length > 0 && (!userProfile || !allowedRoles.includes(userProfile.role))) {
-    // Still show skeleton or minimal content if authorized roles check fails and redirecting
-    return <PageSkeleton />;
+  if (isAuthorizedToRender) {
+    // console.log(`AuthGuard (${pathname}): Rendering children because isAuthorizedToRender is true.`);
+    return <>{children}</>;
   }
 
-  return <>{children}</>;
+  // If not AuthLoading and not AuthorizedToRender, means a redirect is likely pending or conditions not met.
+  // console.log(`AuthGuard (${pathname}): Rendering PageSkeleton as fallback (not loading, not authorized to render).`);
+  return <PageSkeleton />;
 }
