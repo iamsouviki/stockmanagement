@@ -5,7 +5,7 @@ import BillingPageLoadingSkeleton from '@/components/billing/BillingPageLoadingS
 import AuthGuard from '@/components/auth/AuthGuard';
 import type { UserRole } from '@/types';
 
-const allowedRoles: UserRole[] = ['owner', 'employee'];
+const allowedRoles: UserRole[] = ['owner', 'admin', 'employee']; // Added 'admin'
 
 export default function BillingPage() {
   return (
@@ -16,3 +16,4 @@ export default function BillingPage() {
     </AuthGuard>
   );
 }
+
