@@ -11,16 +11,18 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Copy, Printer, Package, Edit } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
-import { Timestamp } from 'firebase/firestore'; 
+import { Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
 import { storeDetails } from '@/config/storeDetails';
-import { generateInvoicePdf } from '@/lib/pdfGenerator'; 
+import { generateInvoicePdf } from '@/lib/pdfGenerator';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import AuthGuard from '@/components/auth/AuthGuard';
 import { useAuth } from '@/hooks/useAuth';
 
-const allowedRoles: UserRole[] = ['owner', 'employee'];
+const allowedPageAccessRoles: UserRole[] = ['owner', 'admin', 'employee'];
+const allowedRecreateRoles: UserRole[] = ['owner', 'admin'];
+const allowedEditRoles: UserRole[] = ['owner'];
 
 export default function OrderDetailPage() {
   const params = useParams();
@@ -86,7 +88,7 @@ export default function OrderDetailPage() {
       console.warn("Unformattable dateValue type in OrderDetailPage:", typeof dateValue, dateValue);
       return 'N/A';
     }
-    
+
     try {
       if (isNaN(dateToFormat.getTime())) {
            console.warn("Invalid Date object after conversion in OrderDetailPage:", dateToFormat, "Original:", dateValue);
@@ -110,9 +112,15 @@ export default function OrderDetailPage() {
   };
 
   const handleEditOrder = () => {
-    // Placeholder for edit order functionality
-    toast({ title: "Edit Order", description: "Order modification feature is not yet implemented.", variant: "default"});
-    // router.push(`/orders/${orderId}/edit`); // Example future route
+    if (order) {
+      router.push(`/billing?fromOrder=${order.id}&intent=edit`);
+    }
+  };
+
+  const handleRecreateBill = () => {
+    if (order) {
+      router.push(`/billing?fromOrder=${order.id}`);
+    }
   };
 
 
@@ -150,8 +158,11 @@ export default function OrderDetailPage() {
     return <p className="text-center text-lg">Order not found.</p>;
   }
 
+  const canEditOrder = userProfile && allowedEditRoles.includes(userProfile.role);
+  const canRecreateBill = userProfile && allowedRecreateRoles.includes(userProfile.role);
+
   return (
-    <AuthGuard allowedRoles={allowedRoles}>
+    <AuthGuard allowedRoles={allowedPageAccessRoles}>
       <div className="space-y-6">
         <Button variant="outline" onClick={() => router.back()} size="sm">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Orders
@@ -224,17 +235,19 @@ export default function OrderDetailPage() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 p-4 sm:p-6">
-            {userProfile?.role === 'owner' && (
+            {canEditOrder && (
               <Button variant="outline" onClick={handleEditOrder} className="w-full sm:w-auto">
-                <Edit className="mr-2 h-4 w-4" /> Edit Order (Placeholder)
+                <Edit className="mr-2 h-4 w-4" /> Edit Order
               </Button>
             )}
             <Button variant="outline" onClick={() => handlePrintOrderPDF(order)} className="w-full sm:w-auto">
               <Printer className="mr-2 h-4 w-4" /> Print Bill
             </Button>
-            <Button onClick={() => router.push(`/billing?fromOrder=${order.id}`)} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
-              <Copy className="mr-2 h-4 w-4" /> Re-create Bill
-            </Button>
+            {canRecreateBill && (
+              <Button onClick={handleRecreateBill} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
+                <Copy className="mr-2 h-4 w-4" /> Re-create Bill
+              </Button>
+            )}
           </CardFooter>
         </Card>
       </div>

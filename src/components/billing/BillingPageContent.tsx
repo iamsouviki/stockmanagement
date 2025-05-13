@@ -1,3 +1,4 @@
+
 // src/components/billing/BillingPageContent.tsx
 "use client";
 
@@ -29,6 +30,7 @@ export default function BillingPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromOrderId = searchParams.get('fromOrder');
+  const intent = searchParams.get('intent'); // Check for 'edit' intent
 
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
@@ -42,6 +44,12 @@ export default function BillingPageContent() {
   const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
 
   const { toast } = useToast();
+
+  const pageTitle = intent === 'edit' ? "Edit Order" : fromOrderId ? "Re-create Bill" : "Create New Bill";
+  const pageDescription = intent === 'edit'
+    ? "Modify the items and customer details for this order and generate an updated bill."
+    : "Add products by barcode/SN and generate a bill for your customer.";
+
 
   const fetchProductData = useCallback(async () => {
     setIsLoadingProducts(true);
@@ -73,7 +81,7 @@ export default function BillingPageContent() {
                 id: item.productId,
                 name: productDetails?.name || item.name,
                 price: productDetails?.price || item.price,
-                quantity: productDetails?.quantity ?? 0, 
+                quantity: productDetails?.quantity ?? 0,
                 billQuantity: item.billQuantity,
                 categoryId: productDetails?.categoryId ?? '',
                 serialNumber: item.serialNumber || productDetails?.serialNumber || '',
@@ -92,21 +100,22 @@ export default function BillingPageContent() {
               setCustomerSearchTerm(order.customerMobile);
               // No need to auto-search if it was a walk-in, just prefill
             }
-            toast({ title: "Order Loaded", description: `Items from order ${order.orderNumber} loaded for re-billing.` });
+            const toastMessage = intent === 'edit' ? `Order ${order.orderNumber} loaded for editing.` : `Items from order ${order.orderNumber} loaded for re-billing.`;
+            toast({ title: "Order Loaded", description: toastMessage });
           } else {
-            toast({ title: "Error", description: "Order not found for re-billing.", variant: "destructive" });
+            toast({ title: "Error", description: "Order not found for re-billing/editing.", variant: "destructive" });
             router.replace('/billing');
           }
         } catch (error) {
-          console.error("Error loading order for re-bill:", error);
-          toast({ title: "Error", description: "Failed to load order for re-billing.", variant: "destructive" });
+          console.error("Error loading order for re-bill/edit:", error);
+          toast({ title: "Error", description: "Failed to load order for re-billing/editing.", variant: "destructive" });
           router.replace('/billing');
         }
         setIsLoadingOrderForRebill(false);
       };
       loadOrderForRebill();
     }
-  }, [fromOrderId, toast, availableProducts, router]);
+  }, [fromOrderId, toast, availableProducts, router, intent]);
 
 
   const handleProductAdd = (barcodeOrSn: string) => {
@@ -281,7 +290,7 @@ export default function BillingPageContent() {
       });
       return;
     }
-    
+
     if (!selectedCustomer && !searchedMobileForNotFound) {
         toast({
             title: "Customer Not Selected",
@@ -290,7 +299,7 @@ export default function BillingPageContent() {
         });
         return;
     }
-    
+
     let customerForOrder: Customer | null = selectedCustomer;
 
     // If a customer was searched but not found, and user proceeds, means it's a new walk-in for this bill
@@ -329,7 +338,7 @@ export default function BillingPageContent() {
       customerId: customerId,
       customerName: customerName,
       customerMobile: customerMobile,
-      customerAddress: customerAddress, 
+      customerAddress: customerAddress,
       items: orderItems,
       subtotal,
       taxAmount,
@@ -342,13 +351,17 @@ export default function BillingPageContent() {
     }));
 
     try {
+      // For now, editing an order means creating a new one.
+      // True in-place order editing would require more complex logic (e.g., reverting stock, handling payment diffs).
+      // If intent === 'edit' and 'fromOrderId' exists, one might consider invalidating/archiving the old order.
+      // For simplicity, we always create a new order.
       const newOrderId = await addOrderAndDecrementStock(orderData, itemsToDecrementStock);
-      const newOrder = await getOrderById(newOrderId); 
+      const newOrder = await getOrderById(newOrderId);
       if (!newOrder) {
         throw new Error("Failed to retrieve the newly created order for PDF generation.");
       }
 
-      generateInvoicePdf(newOrder, storeDetails); 
+      generateInvoicePdf(newOrder, storeDetails);
 
       toast({
         title: "Bill Sent for Printing!",
@@ -358,8 +371,8 @@ export default function BillingPageContent() {
       });
       setBillItems([]);
       handleClearCustomer();
-      fetchProductData(); 
-      if (fromOrderId) router.replace('/billing'); 
+      fetchProductData();
+      if (fromOrderId) router.replace('/billing'); // Clear query params after processing
     } catch (error) {
       console.error("Error finalizing bill:", error);
       toast({
@@ -378,10 +391,10 @@ export default function BillingPageContent() {
     <div className="space-y-6 md:space-y-8">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-primary">
-          {fromOrderId ? "Re-create Bill" : "Create New Bill"}
+          {pageTitle}
         </h1>
         <p className="text-sm sm:text-base text-muted-foreground">
-          Add products by barcode/SN and generate a bill for your customer.
+         {pageDescription}
         </p>
       </div>
 
