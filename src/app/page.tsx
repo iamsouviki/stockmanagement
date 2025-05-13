@@ -1,7 +1,15 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Boxes, Receipt, ArrowRight, Users, History } from 'lucide-react'; // Added History
+import { Boxes, Receipt, ArrowRight, Users, History, BarChart3, PieChart } from 'lucide-react'; 
+import { Suspense } from 'react';
+import OrdersChart from '@/components/dashboard/OrdersChart';
+import StockOverviewChart from '@/components/dashboard/StockOverviewChart';
+import { Skeleton } from '@/components/ui/skeleton';
+
+function ChartSkeleton() {
+  return <Skeleton className="h-[300px] w-full rounded-lg" />;
+}
 
 export default function DashboardPage() {
   return (
@@ -83,6 +91,36 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      <section className="mt-12 grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-xl text-primary flex items-center">
+              <BarChart3 className="mr-2 h-6 w-6" /> Recent Orders (Last 7 Days)
+            </CardTitle>
+            <CardDescription>Number of orders processed daily.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Suspense fallback={<ChartSkeleton />}>
+              <OrdersChart />
+            </Suspense>
+          </CardContent>
+        </Card>
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-xl text-primary flex items-center">
+              <PieChart className="mr-2 h-6 w-6" /> Stock Overview (Top Products)
+            </CardTitle>
+            <CardDescription>Quantity of top 5 most stocked products.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Suspense fallback={<ChartSkeleton />}>
+              <StockOverviewChart />
+            </Suspense>
+          </CardContent>
+        </Card>
+      </section>
+
+
       <section className="mt-12 p-6 bg-card rounded-lg shadow">
         <h2 className="text-xl font-semibold mb-3 text-primary">Key Features</h2>
         <ul className="list-disc list-inside space-y-2 text-muted-foreground">
@@ -91,6 +129,7 @@ export default function DashboardPage() {
           <li><span className="font-medium text-foreground">Order History:</span> Track all past transactions and re-bill.</li>
           <li><span className="font-medium text-foreground">Customer Management:</span> Maintain your customer database.</li>
           <li><span className="font-medium text-foreground">Modern PDF Bills:</span> Professional invoices with store branding.</li>
+          <li><span className="font-medium text-foreground">Dashboard Analytics:</span> Visual insights into orders and stock.</li>
         </ul>
       </section>
     </div>

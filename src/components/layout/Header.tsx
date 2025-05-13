@@ -1,4 +1,4 @@
-// "use client"; // Explicitly marking as client component
+"use client"; // Explicitly marking as client component
 
 import Link from 'next/link';
 import Logo from '@/components/icons/Logo';
@@ -25,13 +25,11 @@ const navLinks: NavLinkItem[] = [
 ];
 
 const Header = () => {
-  // Since Header is a client component (or used in a way that its props are processed),
-  // navLinks is fine here. It passes serializable 'iconName' to NavItem.
   return (
     <header className="bg-primary shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          <Link href="/" passHref legacyBehavior>
+          <Link href="/" passHref>
              <a className="flex items-center" aria-label="StockPilot Home">
                <Logo className="h-8 w-auto" />
              </a>

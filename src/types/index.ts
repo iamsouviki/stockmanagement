@@ -54,7 +54,7 @@ export interface BillItem extends Product { // Used for temporary bill construct
 
 export interface Customer {
   id: string; // Firebase document ID
-  name: string;
+  name: string; // Full name
   mobileNumber: string;
   email?: string;
   address?: string;
@@ -73,3 +73,4 @@ export interface StoreDetails {
   storeType: string;
   gstNo: string;
 }
+

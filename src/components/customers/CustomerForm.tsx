@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Customer } from "@/types";
+import { useEffect } from "react";
 
 const customerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -32,9 +33,10 @@ interface CustomerFormProps {
   customer?: Customer | null;
   onSubmit: (data: CustomerFormData) => void;
   onCancel: () => void;
+  initialMobileNumber?: string;
 }
 
-const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSubmit, onCancel }) => {
+const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSubmit, onCancel, initialMobileNumber }) => {
   const form = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
     defaultValues: customer
@@ -46,11 +48,30 @@ const CustomerForm: React.FC<CustomerFormProps> = ({ customer, onSubmit, onCance
         }
       : {
           name: "",
-          mobileNumber: "",
+          mobileNumber: initialMobileNumber || "", // Pre-fill if adding new and initialMobileNumber is provided
           email: "",
           address: "",
         },
   });
+
+  useEffect(() => {
+    if (!customer && initialMobileNumber) {
+      form.reset({
+        name: "",
+        mobileNumber: initialMobileNumber,
+        email: "",
+        address: "",
+      });
+    } else if (customer) {
+      form.reset({
+        name: customer.name,
+        mobileNumber: customer.mobileNumber,
+        email: customer.email || "",
+        address: customer.address || "",
+      });
+    }
+  }, [customer, initialMobileNumber, form]);
+
 
   return (
     <Form {...form}>

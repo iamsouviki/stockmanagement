@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Trash2, MinusCircle, PlusCircle } from 'lucide-react';
 import Image from 'next/image';
-import { Package } from 'lucide-react';
+import Logo from '@/components/icons/Logo'; // Import Logo
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
@@ -70,8 +70,8 @@ const BillItemsList: React.FC<BillItemsListProps> = ({ items, onRemoveItem, onUp
                           data-ai-hint={item.imageHint || "product item"}
                         />
                       ) : (
-                        <div className="w-10 h-10 bg-secondary rounded-md flex items-center justify-center">
-                          <Package className="h-5 w-5 text-muted-foreground" />
+                        <div className="w-10 h-10 bg-secondary rounded-md flex items-center justify-center overflow-hidden">
+                           <Logo className="h-full w-auto p-1" />
                         </div>
                       )}
                     </TableCell>

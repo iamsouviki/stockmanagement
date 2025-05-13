@@ -1,18 +1,19 @@
-
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from 'react'; // Added Suspense
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import BarcodeEntry from '@/components/billing/BarcodeEntry';
 import BillItemsList from '@/components/billing/BillItemsList';
 import BillSummaryCard from '@/components/billing/BillSummaryCard';
 import type { Product, BillItem, OrderItemData, Order, Customer } from '@/types';
+import type { CustomerFormData } from '@/components/customers/CustomerForm';
+import CustomerDialog from '@/components/customers/CustomerDialog';
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, UserSearch } from "lucide-react";
+import { Terminal, UserSearch, PlusCircle } from "lucide-react";
 import jsPDF from 'jspdf';
 import { format } from 'date-fns';
-import { getProducts, addOrderAndDecrementStock, getOrder as getOrderById, findCustomerByMobile, getCustomer as getCustomerById } from '@/services/firebaseService';
+import { getProducts, addOrderAndDecrementStock, getOrder as getOrderById, findCustomerByMobile, getCustomer as getCustomerById, addCustomer } from '@/services/firebaseService';
 import { storeDetails } from '@/config/storeDetails';
 import { Timestamp } from 'firebase/firestore';
 import { Input } from '@/components/ui/input';
@@ -49,8 +50,11 @@ function BillingPageContent() {
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [searchedMobileForNotFound, setSearchedMobileForNotFound] = useState<string | null>(null);
   const [foundCustomers, setFoundCustomers] = useState<Customer[]>([]);
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
+  const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
+
 
   const { toast } = useToast();
 
@@ -91,8 +95,11 @@ function BillingPageContent() {
             if(order.customerId) {
               const customer = await getCustomerById(order.customerId);
               setSelectedCustomer(customer);
+              if (customer) setCustomerSearchTerm(customer.mobileNumber);
             } else if (order.customerMobile) {
               setCustomerSearchTerm(order.customerMobile);
+              // Trigger search if mobile is present but no customer ID
+              await handleSearchCustomer(order.customerMobile);
             }
             toast({ title: "Order Loaded", description: `Items from order ${order.orderNumber} loaded for re-billing.` });
           } else {
@@ -188,17 +195,24 @@ function BillingPageContent() {
     );
   };
 
-  const handleSearchCustomer = async () => {
-    if (!customerSearchTerm.trim()) {
+  const handleSearchCustomer = async (mobile?: string) => {
+    const term = mobile || customerSearchTerm.trim();
+    if (!term) {
       setFoundCustomers([]);
+      setSearchedMobileForNotFound(null);
       return;
     }
     setIsSearchingCustomer(true);
+    setSearchedMobileForNotFound(null);
     try {
-      const customers = await findCustomerByMobile(customerSearchTerm.trim());
+      const customers = await findCustomerByMobile(term);
       setFoundCustomers(customers);
       if (customers.length === 0) {
-        toast({ title: "No Customer Found", description: "No customer found with this mobile number. You can add a new one or proceed without a customer."});
+        toast({ title: "No Customer Found", description: "No customer with this mobile. You can add them."});
+        setSearchedMobileForNotFound(term); // Store the searched mobile if not found
+      } else {
+        // If multiple customers are found (should ideally not happen with unique mobile), list them.
+        // If one is found, could auto-select or let user click. For now, list all.
       }
     } catch (error) {
       toast({ title: "Search Error", description: "Failed to search for customer.", variant: "destructive"});
@@ -210,13 +224,57 @@ function BillingPageContent() {
     setSelectedCustomer(customer);
     setFoundCustomers([]);
     setCustomerSearchTerm(customer.mobileNumber); 
+    setSearchedMobileForNotFound(null);
   };
 
   const handleClearCustomer = () => {
     setSelectedCustomer(null);
     setCustomerSearchTerm('');
     setFoundCustomers([]);
+    setSearchedMobileForNotFound(null);
   };
+
+  const handleOpenCustomerDialog = () => {
+    setIsCustomerDialogOpen(true);
+  };
+
+  const handleSubmitNewCustomerInBilling = async (data: CustomerFormData) => {
+    try {
+      const existingCustomersWithMobile = await findCustomerByMobile(data.mobileNumber);
+      if (existingCustomersWithMobile.length > 0) {
+        toast({
+          title: "Mobile Number Exists",
+          description: "This mobile number is already associated with another customer.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const customerData = {
+        ...data,
+        imageUrl: `https://picsum.photos/seed/${encodeURIComponent(data.name.split(" ")[0])}/200/200`,
+        imageHint: "person avatar",
+      };
+      const newCustomerId = await addCustomer(customerData);
+      const newCustomerEntry: Customer = {
+        ...customerData,
+        id: newCustomerId,
+      };
+      
+      handleSelectCustomer(newCustomerEntry); // Select the newly added customer
+      setIsCustomerDialogOpen(false);
+      setSearchedMobileForNotFound(null);
+      toast({
+        title: "Customer Added",
+        description: `"${data.name}" has been successfully added and selected for this bill.`,
+      });
+
+    } catch (error) {
+      console.error("Error adding customer from billing:", error);
+      toast({ title: "Error", description: "Failed to add new customer.", variant: "destructive" });
+    }
+  };
+
 
   const generateBillPDF = (order: Order, items: BillItem[]) => {
     const doc = new jsPDF();
@@ -258,7 +316,11 @@ function BillingPageContent() {
 
     if (selectedCustomer) {
       doc.text(`Customer: ${selectedCustomer.name} (${selectedCustomer.mobileNumber})`, margin, yPos);
-    } else if (order.customerName && order.customerMobile) {
+       if(selectedCustomer.address) {
+        yPos +=5;
+        doc.text(`Address: ${selectedCustomer.address}`, margin, yPos);
+      }
+    } else if (order.customerName && order.customerMobile) { // Fallback for re-billed orders if customer not re-selected
        doc.text(`Customer: ${order.customerName} (${order.customerMobile})`, margin, yPos);
     }
      else {
@@ -369,24 +431,21 @@ function BillingPageContent() {
     try {
       const newOrderId = await addOrderAndDecrementStock(orderData, itemsToDecrementStock);
       
-      const tempOrderForPdf: Order = {
-          ...orderData,
-          id: newOrderId,
-          orderNumber: `ORD-${format(new Date(), 'yyyyMMdd-HHmmssSSS')}`, 
-          orderDate: Timestamp.now(), 
+      // Fetch the actual order data to get server-generated fields like orderNumber and precise orderDate
+      const newOrder = await getOrderById(newOrderId);
+      if (!newOrder) {
+          throw new Error("Failed to retrieve the newly created order for PDF generation.");
       }
       
-      generateBillPDF(tempOrderForPdf, billItems);
+      generateBillPDF(newOrder, billItems);
 
       toast({
         title: "Bill Generated!",
         description: "Order saved and PDF has been downloaded.",
         className: "bg-green-500 text-white",
       });
-      setBillItems([]);
-      setSelectedCustomer(null);
-      setCustomerSearchTerm('');
-      setFoundCustomers([]);
+      setBillItems([]); // Clear bill items
+      handleClearCustomer(); // Clear customer details
       fetchProductData(); 
       if (fromOrderId) router.push('/billing'); 
     } catch (error) {
@@ -435,10 +494,15 @@ function BillingPageContent() {
                   type="text"
                   placeholder="Search customer by mobile..."
                   value={customerSearchTerm}
-                  onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setCustomerSearchTerm(e.target.value);
+                    if(searchedMobileForNotFound) setSearchedMobileForNotFound(null); // Clear if user types again
+                    if(foundCustomers.length > 0) setFoundCustomers([]); // Clear previous search results
+                  }}
                   className="flex-grow"
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearchCustomer()}
                 />
-                <Button onClick={handleSearchCustomer} disabled={isSearchingCustomer} className="bg-accent hover:bg-accent/90 text-accent-foreground">
+                <Button onClick={() => handleSearchCustomer()} disabled={isSearchingCustomer} className="bg-accent hover:bg-accent/90 text-accent-foreground">
                   <UserSearch className="mr-2 h-5 w-5" /> {isSearchingCustomer ? "Searching..." : "Search"}
                 </Button>
               </div>
@@ -450,6 +514,14 @@ function BillingPageContent() {
                     </li>
                   ))}
                 </ul>
+              )}
+              {searchedMobileForNotFound && foundCustomers.length === 0 && !isSearchingCustomer && (
+                <div className="mt-2 text-center">
+                  <p className="text-sm text-muted-foreground mb-2">Customer with mobile <span className="font-semibold">{searchedMobileForNotFound}</span> not found.</p>
+                  <Button variant="outline" onClick={handleOpenCustomerDialog}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Customer
+                  </Button>
+                </div>
               )}
             </>
           )}
@@ -483,6 +555,12 @@ function BillingPageContent() {
            }
         </div>
       </div>
+      <CustomerDialog
+        isOpen={isCustomerDialogOpen}
+        onOpenChange={setIsCustomerDialogOpen}
+        onSubmit={handleSubmitNewCustomerInBilling}
+        initialMobileNumber={searchedMobileForNotFound || undefined} 
+      />
     </div>
   );
 }
@@ -495,5 +573,3 @@ export default function BillingPage() {
     </Suspense>
   );
 }
-
-    

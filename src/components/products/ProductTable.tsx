@@ -2,7 +2,7 @@
 "use client";
 
 import Image from 'next/image';
-import type { Product } from "@/types"; // Category prop no longer needed here for icons
+import type { Product } from "@/types"; 
 import {
   Table,
   TableBody,
@@ -13,7 +13,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, Package, Tag } from "lucide-react"; // Added Tag icon
+import { Pencil, Trash2, Tag } from "lucide-react"; 
+import Logo from '@/components/icons/Logo'; // Import Logo
 import {
   AlertDialog,
   AlertDialogAction,
@@ -78,15 +79,15 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onEdit, onDelete 
                           data-ai-hint={product.imageHint || "product item"}
                         />
                       ) : (
-                        <div className="w-10 h-10 bg-secondary rounded-md flex items-center justify-center">
-                          <Package className="h-5 w-5 text-muted-foreground" />
+                        <div className="w-10 h-10 bg-secondary rounded-md flex items-center justify-center overflow-hidden">
+                          <Logo className="h-full w-auto p-1" />
                         </div>
                       )}
                     </TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="flex items-center gap-1.5 w-fit">
-                        <Tag className="h-4 w-4 text-muted-foreground" /> {/* Generic Tag icon */}
+                        <Tag className="h-4 w-4 text-muted-foreground" /> 
                         {product.categoryName || "Unknown"} 
                       </Badge>
                     </TableCell>

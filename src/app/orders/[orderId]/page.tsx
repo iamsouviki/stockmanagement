@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import type { Order, OrderItemData } from '@/types';
+import type { Order } from '@/types';
 import { getOrder } from '@/services/firebaseService';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -13,7 +13,7 @@ import { format } from 'date-fns';
 import { Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
-import { Package } from 'lucide-react';
+import Logo from '@/components/icons/Logo'; // Import Logo
 import jsPDF from 'jspdf';
 import { storeDetails } from '@/config/storeDetails';
 
@@ -69,11 +69,18 @@ export default function OrderDetailPage() {
     const margin = 15;
     let yPos = margin;
 
-    if (storeDetails.logoUrl) {
-      // Placeholder for actual image loading logic
-      // doc.addImage(storeDetails.logoUrl, 'PNG', margin, yPos, 40, 15, undefined, 'FAST');
-      // yPos += 20;
-    }
+    // Add logo if available - using a simple text placeholder for actual image loading
+    // For actual image, you would need to load it (e.g. fetch as base64 or have it preloaded)
+    // then use doc.addImage(imageData, 'PNG', margin, yPos, logoWidth, logoHeight);
+    // For simplicity, let's assume storeDetails.logoUrl could be a base64 string or URL
+    // if (storeDetails.logoUrl && storeDetails.logoUrl.startsWith('data:image')) {
+    //   try {
+    //      // Example: const img = new Image(); img.src = storeDetails.logoUrl; doc.addImage(img, 'PNG', ...);
+    //   } catch (e) { console.error("Error adding logo to PDF", e); }
+    // } else {
+      // Fallback or skip if logo is a URL that needs fetching, or not a data URI
+    // }
+    // yPos += (logoHeight || 0) + 5; // Adjust yPos based on logo height
 
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
@@ -109,6 +116,14 @@ export default function OrderDetailPage() {
       ? `${currentOrder.customerName} (${currentOrder.customerMobile || 'N/A'})`
       : (currentOrder.customerMobile || 'Walk-in Customer');
     doc.text(`Customer: ${customerIdentifier}`, margin, yPos);
+    if (currentOrder.customerName && currentOrder.items.find(it => it.productId === currentOrder.customerId)) { // A bit of a hack to check if customer has address from selectedCustomer
+        const customerForAddress = currentOrder; // Assuming order detail might have customer address
+        // if (customerForAddress.address) { // This field doesn't exist on order, would need to fetch customer or pass through
+        //    yPos +=5;
+        //    doc.text(`Address: ${customerForAddress.address}`, margin, yPos);
+        // }
+    }
+
     yPos += 10;
 
     doc.setLineWidth(0.2);
@@ -246,8 +261,8 @@ export default function OrderDetailPage() {
                           data-ai-hint={item.imageHint || "product item"}
                         />
                       ) : (
-                        <div className="w-10 h-10 bg-secondary rounded-md flex items-center justify-center">
-                          <Package className="h-5 w-5 text-muted-foreground" />
+                        <div className="w-10 h-10 bg-secondary rounded-md flex items-center justify-center overflow-hidden">
+                           <Logo className="h-full w-auto p-1" />
                         </div>
                       )}
                     </TableCell>
