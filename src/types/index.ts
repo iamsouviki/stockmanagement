@@ -1,10 +1,11 @@
-import type { Timestamp } from 'firebase/firestore';
+
+import type { Timestamp as FirestoreTimestampType } from 'firebase/firestore'; // Keep original for other types if needed
 
 export interface Category {
   id: string; // Firebase document ID
   name: string;
-  createdAt?: Timestamp;
-  updatedAt?: Timestamp;
+  createdAt?: FirestoreTimestampType; // Keep as Timestamp for now, address if error occurs for categories
+  updatedAt?: FirestoreTimestampType;
 }
 
 export interface Product {
@@ -18,8 +19,8 @@ export interface Product {
   categoryName?: string; // Denormalized for easier display
   imageUrl?: string;
   imageHint?: string;
-  createdAt?: Timestamp;
-  updatedAt?: Timestamp;
+  createdAt?: FirestoreTimestampType; // Keep as Timestamp for now
+  updatedAt?: FirestoreTimestampType;
 }
 
 export interface OrderItemData {
@@ -27,42 +28,42 @@ export interface OrderItemData {
   name: string;
   price: number; // Price at the time of sale
   billQuantity: number;
-  imageUrl?: string | null; 
-  imageHint?: string | null; 
-  serialNumber?: string | null; 
-  barcode?: string | null; 
+  imageUrl?: string | null;
+  imageHint?: string | null;
+  serialNumber?: string | null;
+  barcode?: string | null;
 }
 
 export interface Order {
   id: string; // Firebase document ID
-  orderNumber: string; 
+  orderNumber: string;
   customerId: string; // Non-optional: Use WALK_IN_CUSTOMER_ID for walk-ins
-  customerName: string; 
-  customerMobile: string; 
-  customerAddress?: string | null; 
+  customerName: string;
+  customerMobile: string;
+  customerAddress?: string | null;
   items: OrderItemData[];
   subtotal: number;
   taxAmount: number;
   totalAmount: number;
-  orderDate: Timestamp; 
-  createdAt?: Timestamp; 
-  updatedAt?: Timestamp; 
+  orderDate: FirestoreTimestampType; // Keep as Timestamp for now
+  createdAt?: FirestoreTimestampType;
+  updatedAt?: FirestoreTimestampType;
 }
 
-export interface BillItem extends Product { 
+export interface BillItem extends Product {
   billQuantity: number;
 }
 
 export interface Customer {
   id: string; // Firebase document ID
-  name: string; 
+  name: string;
   mobileNumber: string;
   email?: string;
   address?: string;
   imageUrl?: string;
   imageHint?: string;
-  createdAt?: Timestamp;
-  updatedAt?: Timestamp;
+  createdAt?: FirestoreTimestampType; // Keep as Timestamp for now
+  updatedAt?: FirestoreTimestampType;
 }
 
 export interface StoreDetails {
@@ -77,15 +78,14 @@ export interface StoreDetails {
 
 export const WALK_IN_CUSTOMER_ID = "WALK_IN_CUSTOMER";
 
-// Updated User types for Authentication and Roles
 export type UserRole = 'owner' | 'admin' | 'employee';
 
 export interface UserProfile {
   id: string; // Firebase Auth UID (which is user.uid)
   email: string | null;
   displayName: string | null;
-  mobileNumber?: string | null; // Added mobile number
+  mobileNumber?: string | null;
   role: UserRole;
-  createdAt?: Timestamp;
-  updatedAt?: Timestamp;
+  createdAt?: string; // Changed from Timestamp to string
+  updatedAt?: string; // Changed from Timestamp to string
 }
