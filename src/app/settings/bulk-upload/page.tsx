@@ -1,22 +1,29 @@
+// src/app/settings/bulk-upload/page.tsx
 'use client';
 
 import AuthGuard from '@/components/auth/AuthGuard';
-import type { UserRole } from '@/types';
+import type { UserRole, Product } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { UploadCloud, ArrowLeft } from 'lucide-react';
+import { UploadCloud, ArrowLeft, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import Link from 'next/link';
+import * as XLSX from 'xlsx';
+import Papa from 'papaparse';
+import { processBulkUpload } from '@/ai/flows/process-bulk-upload-flow'; // Import the flow
+import type { BulkProductEntry } from '@/ai/flows/process-bulk-upload-flow'; // Import the type
 
-const allowedRoles: UserRole[] = ['owner'];
+const allowedRoles: UserRole[] = ['owner', 'admin', 'employee']; // Updated roles
 
 export default function BulkUploadPage() {
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [fileName, setFileName] = useState<string | null>(null);
+
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -25,6 +32,7 @@ export default function BulkUploadPage() {
           selectedFile.name.endsWith('.xlsx') || 
           selectedFile.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
         setFile(selectedFile);
+        setFileName(selectedFile.name);
       } else {
         toast({
           title: "Invalid File Type",
@@ -32,8 +40,12 @@ export default function BulkUploadPage() {
           variant: "destructive",
         });
         setFile(null);
-        event.target.value = ""; // Reset file input
+        setFileName(null);
+        event.target.value = ""; 
       }
+    } else {
+      setFile(null);
+      setFileName(null);
     }
   };
 
@@ -43,29 +55,143 @@ export default function BulkUploadPage() {
       return;
     }
     setIsUploading(true);
-    // Placeholder for actual upload and processing logic
-    // This would involve:
-    // 1. Reading the file (e.g., using FileReader and a library like PapaParse for CSV or SheetJS for Excel)
-    // 2. Structuring the data
-    // 3. Calling a Genkit flow or Firebase function to process and save products
-    // 4. Handling responses and errors
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    toast({
-      title: "Upload Initiated (Placeholder)",
-      description: `File "${file.name}" is being processed. This is a placeholder action.`,
-    });
-    console.log("Selected file for upload:", file);
-    // Reset file input after "upload"
-    setFile(null); 
-    // Find a way to reset the input visually if needed, e.g. by keying the input or form.
-    // For now, just clearing the state. The HTML input might still show the file name.
-    const fileInput = document.getElementById('bulk-product-file') as HTMLInputElement;
-    if (fileInput) fileInput.value = "";
+    try {
+      const fileReader = new FileReader();
+      fileReader.onload = async (event) => {
+        const arrayBuffer = event.target?.result;
+        if (!arrayBuffer) {
+          toast({ title: "File Read Error", description: "Could not read the file.", variant: "destructive" });
+          setIsUploading(false);
+          return;
+        }
 
-    setIsUploading(false);
+        let productsFromFile: BulkProductEntry[] = [];
+        const expectedHeaders = ["Name", "SerialNumber", "Barcode", "Price", "Quantity", "CategoryName"];
+
+        if (file.name.endsWith('.xlsx')) {
+          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json<any>(worksheet, { header: 1 });
+          
+          if (jsonData.length === 0) {
+             toast({ title: "Empty File", description: "The Excel file is empty.", variant: "destructive" });
+             setIsUploading(false);
+             return;
+          }
+          const headers = jsonData[0] as string[];
+          const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
+          if (missingHeaders.length > 0) {
+            toast({ title: "Missing Headers", description: `Excel file is missing headers: ${missingHeaders.join(', ')}`, variant: "destructive", duration: 7000 });
+            setIsUploading(false);
+            return;
+          }
+
+          productsFromFile = jsonData.slice(1).map(row => ({
+            Name: String(row[headers.indexOf("Name")] || ''),
+            SerialNumber: String(row[headers.indexOf("SerialNumber")] || ''),
+            Barcode: String(row[headers.indexOf("Barcode")] || ''),
+            Price: parseFloat(String(row[headers.indexOf("Price")] || 0)),
+            Quantity: parseInt(String(row[headers.indexOf("Quantity")] || 0), 10),
+            CategoryName: String(row[headers.indexOf("CategoryName")] || ''),
+          }));
+
+        } else if (file.type === 'text/csv') {
+          const text = new TextDecoder("utf-8").decode(arrayBuffer as ArrayBuffer);
+          const result = Papa.parse<any>(text, { header: true, skipEmptyLines: true });
+          
+          if (result.errors.length > 0) {
+             toast({ title: "CSV Parsing Error", description: `Error parsing CSV: ${result.errors[0].message}`, variant: "destructive" });
+             setIsUploading(false);
+             return;
+          }
+          if (result.data.length === 0) {
+            toast({ title: "Empty File", description: "The CSV file is empty or contains no data rows.", variant: "destructive" });
+            setIsUploading(false);
+            return;
+          }
+          
+          const headers = result.meta.fields || [];
+          const missingHeaders = expectedHeaders.filter(h => !headers.includes(h));
+          if (missingHeaders.length > 0) {
+            toast({ title: "Missing Headers", description: `CSV file is missing headers: ${missingHeaders.join(', ')}`, variant: "destructive", duration: 7000 });
+            setIsUploading(false);
+            return;
+          }
+
+          productsFromFile = result.data.map(row => ({
+            Name: String(row.Name || ''),
+            SerialNumber: String(row.SerialNumber || ''),
+            Barcode: String(row.Barcode || ''),
+            Price: parseFloat(String(row.Price || 0)),
+            Quantity: parseInt(String(row.Quantity || 0), 10),
+            CategoryName: String(row.CategoryName || ''),
+          }));
+        }
+
+        productsFromFile = productsFromFile.filter(p => p.Name && (p.SerialNumber || p.Barcode) && p.CategoryName); // Basic validation
+
+        if(productsFromFile.length === 0){
+            toast({ title: "No Valid Products", description: "No valid product entries found in the file. Ensure Name, SerialNumber/Barcode, and CategoryName are present.", variant: "destructive", duration: 7000 });
+            setIsUploading(false);
+            return;
+        }
+
+
+        const flowResult = await processBulkUpload({ products: productsFromFile });
+
+        if (flowResult.errors && flowResult.errors.length > 0) {
+            toast({
+                title: `Bulk Upload Partially Successful (${flowResult.successCount} / ${productsFromFile.length})`,
+                description: (
+                  <div>
+                    <p>{flowResult.message}</p>
+                    {flowResult.newCategoriesCreated && flowResult.newCategoriesCreated.length > 0 && <p>New categories created: {flowResult.newCategoriesCreated.join(', ')}</p>}
+                    <p className="font-semibold mt-2">Errors:</p>
+                    <ul className="list-disc list-inside max-h-32 overflow-y-auto text-xs">
+                      {flowResult.errors.slice(0, 5).map((err, i) => <li key={i}>{err}</li>)}
+                      {flowResult.errors.length > 5 && <li>...and {flowResult.errors.length - 5} more.</li>}
+                    </ul>
+                  </div>
+                ),
+                variant: "destructive", // Or "default" if some were successful
+                duration: 10000,
+              });
+        } else {
+            toast({
+                title: "Bulk Upload Successful!",
+                description: (
+                  <div>
+                     <p>{flowResult.message} Processed {flowResult.successCount} products.</p>
+                     {flowResult.newCategoriesCreated && flowResult.newCategoriesCreated.length > 0 && <p>New categories created: {flowResult.newCategoriesCreated.join(', ')}</p>}
+                  </div>
+                ),
+                className: "bg-green-500 text-white", // Custom success style
+                duration: 7000,
+            });
+        }
+
+      };
+
+      fileReader.onerror = () => {
+        toast({ title: "File Read Error", description: "An error occurred while reading the file.", variant: "destructive" });
+        setIsUploading(false);
+      };
+      
+      fileReader.readAsArrayBuffer(file);
+
+    } catch (error) {
+      console.error("Error during upload process:", error);
+      toast({ title: "Upload Error", description: "An unexpected error occurred during upload.", variant: "destructive" });
+    } finally {
+      // Reset file input after "upload"
+      const fileInput = document.getElementById('bulk-product-file') as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
+      setFile(null);
+      setFileName(null);
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -87,9 +213,9 @@ export default function BulkUploadPage() {
           <CardHeader>
             <CardTitle className="text-lg">Upload File</CardTitle>
             <CardDescription>
-              Ensure your file has columns for: Name, SerialNumber, Barcode, Price, Quantity, CategoryName.
+              Ensure your file has columns: <span className="font-semibold">Name, SerialNumber, Barcode, Price, Quantity, CategoryName</span>.
               <br />
-              If a CategoryName does not exist, it will be created automatically.
+              If a CategoryName does not exist, it will be created automatically. Price and Quantity should be numbers.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -102,14 +228,12 @@ export default function BulkUploadPage() {
                 onChange={handleFileChange}
                 disabled={isUploading}
               />
-              {file && <p className="text-sm text-muted-foreground mt-1">Selected: {file.name}</p>}
+              {fileName && <p className="text-sm text-muted-foreground mt-1">Selected: {fileName}</p>}
             </div>
             <Button onClick={handleUpload} disabled={!file || isUploading} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-              <UploadCloud className="mr-2 h-5 w-5" /> {isUploading ? "Uploading..." : "Upload Products"}
+              {isUploading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <UploadCloud className="mr-2 h-5 w-5" />}
+              {isUploading ? "Processing..." : "Upload Products"}
             </Button>
-            <p className="text-xs text-muted-foreground mt-2">
-                Note: This is a placeholder. Actual file processing and database updates are not yet implemented.
-            </p>
           </CardContent>
         </Card>
       </div>

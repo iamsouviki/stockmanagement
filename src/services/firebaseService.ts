@@ -1,3 +1,4 @@
+
 import { db } from '@/lib/firebase';
 import {
   collection,
@@ -15,16 +16,25 @@ import {
   orderBy,
   limit,
   startAfter,
+  type FieldPath, // Import FieldPath
+  type OrderByDirection, // Import OrderByDirection
 } from 'firebase/firestore';
 import type { Product, Customer, Category, Order, OrderItemData } from '@/types';
 import { WALK_IN_CUSTOMER_ID } from '@/types'; 
 import { format } from 'date-fns';
 
 // Generic CRUD operations
-const getCollection = async <T>(collectionName: string, orderByField?: keyof T, orderDirection: 'asc' | 'desc' = 'asc', pageLimit: number = 0, lastVisible?: any): Promise<T[]> => {
-  let q = collection(db, collectionName);
+const getCollection = async <T extends Record<string, any>>(
+  collectionName: string,
+  orderByField?: Extract<keyof T, string>, // Ensures orderByField is a string key of T
+  orderDirection: OrderByDirection = 'asc',
+  pageLimit: number = 0,
+  lastVisible?: any
+): Promise<T[]> => {
+  let q = query(collection(db, collectionName)); // Initialize q with collection first
   if (orderByField) {
-    // @ts-ignore
+    // orderByField is now guaranteed to be a string key of T, or undefined.
+    // The if check handles undefined.
     q = query(q, orderBy(orderByField, orderDirection));
   }
   if (pageLimit > 0) {
@@ -39,7 +49,7 @@ const getCollection = async <T>(collectionName: string, orderByField?: keyof T, 
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
 };
 
-const getDocument = async <T>(collectionName: string, id: string): Promise<T | null> => {
+const getDocument = async <T extends Record<string, any>>(collectionName: string, id: string): Promise<T | null> => {
   const docRef = doc(db, collectionName, id);
   const docSnap = await getDoc(docRef);
   return docSnap.exists() ? ({ id: docSnap.id, ...docSnap.data() } as T) : null;
@@ -68,9 +78,35 @@ const deleteDocument = async (collectionName: string, id: string): Promise<void>
 
 // Categories Service
 export const getCategories = () => getCollection<Category>('categories', 'name');
-export const addCategory = (data: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>) => addDocument<Category>('categories', data);
+export const addCategory = async (data: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>): Promise<Category> => {
+  const id = await addDocument<Category>('categories', data);
+  // Firestore Timestamps are server-generated, so we can't immediately return them as Date/string.
+  // For immediate use, return the input data with the ID. The actual timestamps will be in DB.
+  return { id, ...data, createdAt: Timestamp.now(), updatedAt: Timestamp.now() }; // Approximate for return
+};
 export const updateCategory = (id: string, data: Partial<Omit<Category, 'id' | 'createdAt' | 'updatedAt'>>) => updateDocument<Category>('categories', id, data);
 export const deleteCategory = (id: string) => deleteDocument('categories', id);
+
+export const findCategoryByNameOrCreate = async (name: string): Promise<Category> => {
+  const trimmedName = name.trim();
+  const categoriesRef = collection(db, 'categories');
+  // Firestore queries are case-sensitive. Fetch all and filter, or enforce consistent casing.
+  // For simplicity here, fetching all and filtering. This might not be scalable for huge category lists.
+  // A better approach for large scale would be to store a lower-case version of the name for querying.
+  const allCategories = await getCategories(); 
+  const existingCategory = allCategories.find(cat => cat.name.toLowerCase() === trimmedName.toLowerCase());
+
+  if (existingCategory) {
+    return existingCategory;
+  } else {
+    const newCategoryData = { name: trimmedName };
+    const newCategoryId = await addDocument<Category>('categories', newCategoryData);
+    // Fetch the newly created category to get timestamps if needed, or construct manually for return
+    // const createdCategory = await getDocument<Category>('categories', newCategoryId);
+    // return createdCategory!; 
+    return { id: newCategoryId, name: trimmedName, createdAt: Timestamp.now(), updatedAt: Timestamp.now() }; // Approximate for return
+  }
+};
 
 
 // Products Service
@@ -79,6 +115,31 @@ export const getProduct = (id: string) => getDocument<Product>('products', id);
 export const addProduct = (data: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => addDocument<Product>('products', data);
 export const updateProduct = (id: string, data: Partial<Omit<Product, 'id'| 'createdAt' | 'updatedAt'>>) => updateDocument<Product>('products', id, data);
 export const deleteProduct = (id: string) => deleteDocument('products', id);
+
+export const findProductBySerialNumberOrBarcode = async (serialNumber?: string, barcode?: string): Promise<Product | null> => {
+  const productsRef = collection(db, 'products');
+  let q;
+
+  if (serialNumber) {
+    q = query(productsRef, where('serialNumber', '==', serialNumber), limit(1));
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      const docData = snapshot.docs[0];
+      return { id: docData.id, ...docData.data() } as Product;
+    }
+  }
+
+  if (barcode) {
+    q = query(productsRef, where('barcode', '==', barcode), limit(1));
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      const docData = snapshot.docs[0];
+      return { id: docData.id, ...docData.data() } as Product;
+    }
+  }
+  return null;
+};
+
 
 // Customers Service
 export const getCustomers = () => getCollection<Customer>('customers', 'name');
@@ -104,16 +165,12 @@ export const addOrderAndDecrementStock = async (
   const batch = writeBatch(db);
   const now = new Date();
   const orderNumber = `ORD-${format(now, 'yyyyMMdd-HHmmssSSS')}`;
-
-  // 'orderData' from BillingPageContent.tsx already contains resolved customerId, customerName, customerMobile, 
-  // customerAddress (or defaults for walk-in), items, subtotal, taxAmount, and totalAmount.
-  // We just need to add the server-generated fields.
   
   const completeOrderData: Omit<Order, 'id'> = {
-    ...orderData, // Spread client-prepared data (includes customer details, items, totals)
+    ...orderData, 
     orderNumber,
     orderDate: Timestamp.fromDate(now),
-    createdAt: serverTimestamp() as Timestamp, // Firestore will set these
+    createdAt: serverTimestamp() as Timestamp, 
     updatedAt: serverTimestamp() as Timestamp,
   };
 
@@ -122,15 +179,13 @@ export const addOrderAndDecrementStock = async (
 
   for (const item of itemsToDecrement) {
     const productRef = doc(db, 'products', item.productId);
-    const productSnap = await getDoc(productRef);
+    const productSnap = await getDoc(productRef); // Important: getDoc is async
     if (productSnap.exists()) {
       const currentStock = productSnap.data().quantity || 0;
       const newStock = Math.max(0, currentStock - item.quantity);
       batch.update(productRef, { quantity: newStock, updatedAt: serverTimestamp() });
     } else {
-      // This case should ideally not happen if product selection is robust
       console.warn(`Product with ID ${item.productId} not found for stock decrement.`);
-      // Consider how to handle this - rollback or proceed with a warning. For now, it proceeds.
     }
   }
 
