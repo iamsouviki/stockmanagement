@@ -12,7 +12,7 @@ import type { CustomerFormData } from '@/components/customers/CustomerForm';
 import CustomerDialog from '@/components/customers/CustomerDialog';
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, UserSearch, PlusCircle, Info } from "lucide-react";
+import { UserSearch, PlusCircle, Info } from "lucide-react";
 // import jsPDF from 'jspdf'; // No longer directly used here
 // import { format } from 'date-fns'; // No longer directly used here for PDF
 import { getProducts, addOrderAndDecrementStock, getOrder as getOrderById, findCustomerByMobile, getCustomer as getCustomerById, addCustomer } from '@/services/firebaseService';
@@ -454,21 +454,21 @@ export default function BillingPageContent() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 items-start">
         <div className="lg:col-span-2 space-y-6">
           <BarcodeEntry onProductAdd={handleProductAdd} />
-          {billItems.length > 0 ? (
-            <BillItemsList
-              items={billItems}
-              onRemoveItem={handleRemoveItem}
-              onUpdateQuantity={handleUpdateQuantity}
-            />
-          ) : (
+          {billItems.length === 0 ? (
             isLoadingProducts ? <Skeleton className="h-40 w-full" /> :
               <Alert className="border-accent text-accent">
-                <Terminal className="h-4 w-4 !text-accent" />
+                
                 <AlertTitle>Empty Bill</AlertTitle>
                 <AlertDescription>
                   Scan or enter a product barcode/SN to start building the bill.
                 </AlertDescription>
               </Alert>
+          ) : (
+            <BillItemsList
+              items={billItems}
+              onRemoveItem={handleRemoveItem}
+              onUpdateQuantity={handleUpdateQuantity}
+            />
           )}
         </div>
         <div className="lg:col-span-1 lg:sticky lg:top-20">
