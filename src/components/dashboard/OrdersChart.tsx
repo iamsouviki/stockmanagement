@@ -7,7 +7,6 @@ import {
   ChartContainer,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-// import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'; // Not used directly here
 import { getOrders } from '@/services/firebaseService';
 import type { Order } from '@/types';
 import { format, subDays, parseISO } from 'date-fns';
@@ -27,12 +26,12 @@ const OrdersChart = () => {
     const fetchAndProcessOrders = async () => {
       setIsLoading(true);
       try {
-        const orders = await getOrders(); // Assuming this fetches all orders, sorted by date desc
+        const orders = await getOrders(); 
 
         const last7Days = Array.from({ length: 7 }, (_, i) => {
           const d = subDays(new Date(), i);
           return format(d, 'yyyy-MM-dd');
-        }).reverse(); // dates from oldest to newest
+        }).reverse(); 
 
         const dailyOrdersMap = new Map<string, number>();
         last7Days.forEach(day => dailyOrdersMap.set(day, 0));
@@ -46,13 +45,13 @@ const OrdersChart = () => {
               orderDateStr = format(parseISO(order.orderDate), 'yyyy-MM-dd');
             } catch (e) {
                console.warn("Could not parse orderDate string:", order.orderDate, e);
-               return; // Skip if date is invalid string
+               return; 
             }
           } else if (order.orderDate instanceof Date) {
             orderDateStr = format(order.orderDate, 'yyyy-MM-dd');
           } else {
             console.warn("Invalid orderDate type:", typeof order.orderDate, order.orderDate);
-            return; // Skip if date is invalid
+            return; 
           }
           
           if (dailyOrdersMap.has(orderDateStr)) {
@@ -61,14 +60,13 @@ const OrdersChart = () => {
         });
         
         const processedData: DailyOrderData[] = last7Days.map(date => ({
-          date: format(parseISO(date), 'MMM dd'), // Format for X-axis label
+          date: format(parseISO(date), 'MMM dd'), 
           orders: dailyOrdersMap.get(date) || 0,
         }));
 
         setChartData(processedData);
       } catch (error) {
         console.error("Error fetching or processing orders for chart:", error);
-        // Handle error display if necessary
       }
       setIsLoading(false);
     };
@@ -95,28 +93,32 @@ const OrdersChart = () => {
   return (
     <ChartContainer config={chartConfig} className="min-h-[250px] sm:min-h-[300px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}> {/* Adjusted left margin for YAxis labels */}
+        <BarChart 
+          data={chartData} 
+          margin={{ top: 5, right: 5, left: 0, bottom: 5 }} // Adjusted margins
+        >
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="date"
             tickLine={false}
             axisLine={false}
             tickMargin={8}
-            fontSize={10} // Slightly smaller font size for X-axis
+            fontSize={10} 
+            interval={0} // Ensure all 7 days are shown if space allows
           />
           <YAxis 
             tickLine={false} 
             axisLine={false} 
             tickMargin={8} 
-            fontSize={10} // Slightly smaller font size for Y-axis
+            fontSize={10} 
             allowDecimals={false} 
-            width={25} // Give YAxis a bit more space
+            width={25} // Allocate space for Y-axis labels
           />
           <Tooltip
             cursor={false}
             content={<ChartTooltipContent />}
           />
-          <Bar dataKey="orders" fill="var(--color-orders)" radius={4} />
+          <Bar dataKey="orders" fill="var(--color-orders)" radius={4} maxBarSize={50} />
         </BarChart>
       </ResponsiveContainer>
     </ChartContainer>
