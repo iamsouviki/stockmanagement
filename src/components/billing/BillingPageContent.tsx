@@ -338,8 +338,8 @@ export default function BillingPageContent() {
       doc.text(item.name, headX[0], yPos, { maxWidth: headX[1] - headX[0] - 5 });
       doc.text(item.serialNumber || item.barcode, headX[1], yPos, { maxWidth: headX[2] - headX[1] - 5 });
       doc.text(item.billQuantity.toString(), headX[2], yPos, { align: 'right' });
-      doc.text(`$${item.price.toFixed(2)}`, headX[3], yPos, { align: 'right' });
-      doc.text(`$${itemSubtotal.toFixed(2)}`, headX[4] + 30, yPos, { align: 'right' });
+      doc.text(`₹${item.price.toFixed(2)}`, headX[3], yPos, { align: 'right' });
+      doc.text(`₹${itemSubtotal.toFixed(2)}`, headX[4] + 30, yPos, { align: 'right' });
       yPos += 6;
     });
 
@@ -350,11 +350,12 @@ export default function BillingPageContent() {
 
     doc.setFontSize(10);
     doc.text('Subtotal:', summaryX, yPos, { align: 'right' });
-    doc.text(`$${order.subtotal.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
+    doc.text(`₹${order.subtotal.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
     yPos += 6;
 
-    doc.text(`Tax (${(storeDetails.gstNo ? (0.08 * 100) : 0).toFixed(0)}%):`, summaryX, yPos, { align: 'right' });
-    doc.text(`$${order.taxAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
+    const taxRate = 0.18; // Ensure this matches the calculation
+    doc.text(`GST (${(taxRate * 100).toFixed(0)}%):`, summaryX, yPos, { align: 'right' });
+    doc.text(`₹${order.taxAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
     yPos += 6;
 
     doc.setFontSize(12);
@@ -362,7 +363,7 @@ export default function BillingPageContent() {
     doc.line(summaryX - 20, yPos, pageWidth - margin, yPos);
     yPos += 6;
     doc.text('Total Amount:', summaryX, yPos, { align: 'right' });
-    doc.text(`$${order.totalAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
+    doc.text(`₹${order.totalAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
     yPos += 15;
 
     doc.setFontSize(8);
@@ -383,7 +384,7 @@ export default function BillingPageContent() {
     }
 
     const subtotal = billItems.reduce((sum, item) => sum + item.price * item.billQuantity, 0);
-    const taxRate = 0.08;
+    const taxRate = 0.18; // Updated tax rate to 18%
     const taxAmount = subtotal * taxRate;
     const totalAmount = subtotal + taxAmount;
 

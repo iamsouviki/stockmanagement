@@ -68,19 +68,7 @@ export default function OrderDetailPage() {
     const pageWidth = doc.internal.pageSize.width;
     const margin = 15;
     let yPos = margin;
-
-    // Add logo if available - using a simple text placeholder for actual image loading
-    // For actual image, you would need to load it (e.g. fetch as base64 or have it preloaded)
-    // then use doc.addImage(imageData, 'PNG', margin, yPos, logoWidth, logoHeight);
-    // For simplicity, let's assume storeDetails.logoUrl could be a base64 string or URL
-    // if (storeDetails.logoUrl && storeDetails.logoUrl.startsWith('data:image')) {
-    //   try {
-    //      // Example: const img = new Image(); img.src = storeDetails.logoUrl; doc.addImage(img, 'PNG', ...);
-    //   } catch (e) { console.error("Error adding logo to PDF", e); }
-    // } else {
-      // Fallback or skip if logo is a URL that needs fetching, or not a data URI
-    // }
-    // yPos += (logoHeight || 0) + 5; // Adjust yPos based on logo height
+    const taxRate = 0.18; // 18% GST
 
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
@@ -116,14 +104,9 @@ export default function OrderDetailPage() {
       ? `${currentOrder.customerName} (${currentOrder.customerMobile || 'N/A'})`
       : (currentOrder.customerMobile || 'Walk-in Customer');
     doc.text(`Customer: ${customerIdentifier}`, margin, yPos);
-    if (currentOrder.customerName && currentOrder.items.find(it => it.productId === currentOrder.customerId)) { // A bit of a hack to check if customer has address from selectedCustomer
-        const customerForAddress = currentOrder; // Assuming order detail might have customer address
-        // if (customerForAddress.address) { // This field doesn't exist on order, would need to fetch customer or pass through
-        //    yPos +=5;
-        //    doc.text(`Address: ${customerForAddress.address}`, margin, yPos);
-        // }
-    }
-
+    // Note: Customer address is not directly on order object, would need separate fetch or be part of customerName field.
+    // For simplicity, we're not displaying customer address here.
+    
     yPos += 10;
 
     doc.setLineWidth(0.2);
@@ -150,8 +133,8 @@ export default function OrderDetailPage() {
       doc.text(item.name, headX[0], yPos, { maxWidth: headX[1] - headX[0] - 5 });
       doc.text(item.serialNumber || item.barcode || 'N/A', headX[1], yPos, { maxWidth: headX[2] - headX[1] - 5 });
       doc.text(item.billQuantity.toString(), headX[2], yPos, { align: 'right' });
-      doc.text(`$${item.price.toFixed(2)}`, headX[3], yPos, { align: 'right' });
-      doc.text(`$${itemSubtotal.toFixed(2)}`, headX[4] + 30, yPos, { align: 'right' });
+      doc.text(`₹${item.price.toFixed(2)}`, headX[3], yPos, { align: 'right' });
+      doc.text(`₹${itemSubtotal.toFixed(2)}`, headX[4] + 30, yPos, { align: 'right' });
       yPos += 6;
     });
 
@@ -162,10 +145,10 @@ export default function OrderDetailPage() {
 
     doc.setFontSize(10);
     doc.text('Subtotal:', summaryX, yPos, { align: 'right' });
-    doc.text(`$${currentOrder.subtotal.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
+    doc.text(`₹${currentOrder.subtotal.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
     yPos += 6;
-    doc.text(`Tax (${(storeDetails.gstNo ? (0.08 * 100) : 0).toFixed(0)}%):`, summaryX, yPos, { align: 'right' });
-    doc.text(`$${currentOrder.taxAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
+    doc.text(`GST (${(taxRate * 100).toFixed(0)}%):`, summaryX, yPos, { align: 'right' });
+    doc.text(`₹${currentOrder.taxAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
     yPos += 6;
 
     doc.setFontSize(12);
@@ -173,7 +156,7 @@ export default function OrderDetailPage() {
     doc.line(summaryX - 20, yPos, pageWidth - margin, yPos);
     yPos += 6;
     doc.text('Total Amount:', summaryX, yPos, { align: 'right' });
-    doc.text(`$${currentOrder.totalAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
+    doc.text(`₹${currentOrder.totalAmount.toFixed(2)}`, pageWidth - margin, yPos, { align: 'right' });
     yPos += 15;
 
     doc.setFontSize(8);
@@ -268,9 +251,9 @@ export default function OrderDetailPage() {
                     </TableCell>
                     <TableCell>{item.name}</TableCell>
                     <TableCell>{item.serialNumber || item.barcode || 'N/A'}</TableCell>
-                    <TableCell className="text-right">${item.price.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">₹{item.price.toFixed(2)}</TableCell>
                     <TableCell className="text-center">{item.billQuantity}</TableCell>
-                    <TableCell className="text-right">${(item.price * item.billQuantity).toFixed(2)}</TableCell>
+                    <TableCell className="text-right">₹{(item.price * item.billQuantity).toFixed(2)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -278,13 +261,13 @@ export default function OrderDetailPage() {
           </div>
           <div className="text-right space-y-1 pr-4">
             <p>
-              Subtotal: <span className="font-semibold">${order.subtotal.toFixed(2)}</span>
+              Subtotal: <span className="font-semibold">₹{order.subtotal.toFixed(2)}</span>
             </p>
             <p>
-              Tax: <span className="font-semibold">${order.taxAmount.toFixed(2)}</span>
+              GST: <span className="font-semibold">₹{order.taxAmount.toFixed(2)}</span>
             </p>
             <p className="text-xl font-bold">
-              Total: <span className="text-primary">${order.totalAmount.toFixed(2)}</span>
+              Total: <span className="text-primary">₹{order.totalAmount.toFixed(2)}</span>
             </p>
           </div>
         </CardContent>

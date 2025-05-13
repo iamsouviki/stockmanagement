@@ -67,7 +67,7 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders }) => {
                             <TableCell className="font-medium">{order.orderNumber}</TableCell>
                             <TableCell>{order.customerName || order.customerMobile || 'Walk-in'}</TableCell>
                             <TableCell>{formatDate(order.orderDate)}</TableCell>
-                            <TableCell className="text-right">${order.totalAmount.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">₹{order.totalAmount.toFixed(2)}</TableCell>
                             <TableCell className="text-center">{order.items.length}</TableCell>
                             <TableCell className="text-center">
                             <div className="flex justify-center space-x-2">

@@ -76,7 +76,7 @@ const BillItemsList: React.FC<BillItemsListProps> = ({ items, onRemoveItem, onUp
                       )}
                     </TableCell>
                     <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell className="text-right">${item.price.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">₹{item.price.toFixed(2)}</TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center space-x-2">
                         <Button variant="ghost" size="icon" onClick={() => handleQuantityChange(item.id, item.billQuantity, -1)} disabled={item.billQuantity <= 1}>
@@ -94,7 +94,7 @@ const BillItemsList: React.FC<BillItemsListProps> = ({ items, onRemoveItem, onUp
                         </Button>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">${(item.price * item.billQuantity).toFixed(2)}</TableCell>
+                    <TableCell className="text-right">₹{(item.price * item.billQuantity).toFixed(2)}</TableCell>
                     <TableCell className="text-center">
                       <Button variant="ghost" size="icon" onClick={() => onRemoveItem(item.id)} title="Remove Item">
                         <Trash2 className="h-4 w-4 text-red-600" />

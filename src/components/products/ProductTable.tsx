@@ -93,7 +93,7 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onEdit, onDelete 
                     </TableCell>
                     <TableCell>{product.serialNumber}</TableCell>
                     <TableCell>{product.barcode}</TableCell>
-                    <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">₹{product.price.toFixed(2)}</TableCell>
                     <TableCell className="text-right">{product.quantity}</TableCell>
                     <TableCell className="text-center">
                       <div className="flex justify-center space-x-2">

@@ -13,7 +13,7 @@ interface BillSummaryCardProps {
 
 const BillSummaryCard: React.FC<BillSummaryCardProps> = ({ items, onFinalizeBill }) => {
   const subtotal = items.reduce((sum, item) => sum + item.price * item.billQuantity, 0);
-  const taxRate = 0.08; // Example tax rate: 8%
+  const taxRate = 0.18; // Updated tax rate to 18%
   const taxAmount = subtotal * taxRate;
   const totalAmount = subtotal + taxAmount;
 
@@ -26,16 +26,16 @@ const BillSummaryCard: React.FC<BillSummaryCardProps> = ({ items, onFinalizeBill
       <CardContent className="space-y-3">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Subtotal:</span>
-          <span className="font-medium">${subtotal.toFixed(2)}</span>
+          <span className="font-medium">₹{subtotal.toFixed(2)}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-muted-foreground">Tax ({ (taxRate * 100).toFixed(0) }%):</span>
-          <span className="font-medium">${taxAmount.toFixed(2)}</span>
+          <span className="text-muted-foreground">GST ({ (taxRate * 100).toFixed(0) }%):</span>
+          <span className="font-medium">₹{taxAmount.toFixed(2)}</span>
         </div>
         <Separator />
         <div className="flex justify-between text-lg font-semibold">
           <span className="text-foreground">Total Amount:</span>
-          <span className="text-primary">${totalAmount.toFixed(2)}</span>
+          <span className="text-primary">₹{totalAmount.toFixed(2)}</span>
         </div>
       </CardContent>
       <CardFooter>
