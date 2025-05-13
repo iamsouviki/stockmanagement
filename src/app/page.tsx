@@ -170,19 +170,10 @@ export default function DashboardPage() {
             </Card>
           </AuthGuard>
         </div>
-
-        <section className="p-4 sm:p-6 bg-card rounded-lg shadow">
-          <h2 className="text-lg sm:text-xl font-semibold mb-3 text-primary">Key Features</h2>
-          <ul className="list-disc list-inside space-y-1.5 sm:space-y-2 text-sm sm:text-base text-muted-foreground">
-            <li><span className="font-medium text-foreground">Firebase Integration:</span> All data stored securely in Firestore.</li>
-            <li><span className="font-medium text-foreground">Real-time Stock Updates:</span> Inventory levels adjusted after each sale.</li>
-            <li><span className="font-medium text-foreground">Order History:</span> Track all past transactions and re-bill.</li>
-            <li><span className="font-medium text-foreground">Customer Management:</span> Maintain your customer database.</li>
-            <li><span className="font-medium text-foreground">Modern PDF Bills:</span> Professional invoices with store branding.</li>
-            <li><span className="font-medium text-foreground">Dashboard Analytics:</span> Visual insights into orders and stock.</li>
-            <li><span className="font-medium text-foreground">Role-Based Access:</span> Separate functionalities for owners and employees.</li>
-          </ul>
-        </section>
+        
+        <footer className="text-center py-4 text-sm text-muted-foreground">
+          Created By Souvik Ghosh
+        </footer>
       </div>
     </AuthGuard>
   );
