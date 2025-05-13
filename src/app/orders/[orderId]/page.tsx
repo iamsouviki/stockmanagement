@@ -7,13 +7,13 @@ import { getOrder } from '@/services/firebaseService';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Copy, Printer } from 'lucide-react';
+import { ArrowLeft, Copy, Printer, Package } from 'lucide-react'; // Added Package
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
 import { Timestamp } from 'firebase/firestore'; 
 import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
-import Logo from '@/components/icons/Logo';
+// import Logo from '@/components/icons/Logo'; // No longer needed here
 import { storeDetails } from '@/config/storeDetails';
 import { generateInvoicePdf } from '@/lib/pdfGenerator'; 
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -185,8 +185,8 @@ export default function OrderDetailPage() {
                             data-ai-hint={item.imageHint || "product item"}
                           />
                         ) : (
-                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-secondary rounded-md flex items-center justify-center overflow-hidden">
-                             <Logo className="h-full w-auto p-0.5 sm:p-1" />
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-secondary rounded-md flex items-center justify-center text-muted-foreground">
+                             <Package className="h-5 w-5 sm:h-6 sm:w-6" />
                           </div>
                         )}
                       </TableCell>

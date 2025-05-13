@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'StockPilot - Electronics Stock Management',
-  description: 'Manage your electronics store stock efficiently with StockPilot.',
+  title: 'PAS Trading CO - Electronics Stock Management',
+  description: 'Manage your electronics store stock efficiently with PAS Trading CO.',
 };
 
 export default function RootLayout({

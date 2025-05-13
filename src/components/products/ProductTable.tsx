@@ -12,8 +12,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, Tag } from "lucide-react"; 
-import Logo from '@/components/icons/Logo'; 
+import { Pencil, Trash2, Tag, Package } from "lucide-react"; // Added Package
+// import Logo from '@/components/icons/Logo'; // No longer needed here
 import {
   AlertDialog,
   AlertDialogAction,
@@ -78,8 +78,8 @@ const ProductTable: React.FC<ProductTableProps> = ({ products, onEdit, onDelete 
                           data-ai-hint={product.imageHint || "product item"}
                         />
                       ) : (
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-secondary rounded-md flex items-center justify-center overflow-hidden">
-                          <Logo className="h-full w-auto p-0.5 sm:p-1" />
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-secondary rounded-md flex items-center justify-center text-muted-foreground">
+                          <Package className="h-5 w-5 sm:h-6 sm:w-6" />
                         </div>
                       )}
                     </TableCell>

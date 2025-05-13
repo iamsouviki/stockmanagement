@@ -37,7 +37,7 @@ export default function Header() {
           <Link 
             href="/" 
             className="flex items-center cursor-pointer" 
-            aria-label="StockPilot Home"
+            aria-label="PAS Trading CO Home"
           >
             <Logo className="h-7 sm:h-8 w-auto" />
           </Link>
@@ -63,7 +63,7 @@ export default function Header() {
                    <Link 
                     href="/" 
                     className="flex items-center cursor-pointer" 
-                    aria-label="StockPilot Home" 
+                    aria-label="PAS Trading CO Home" 
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                       <Logo className="h-7 sm:h-8 w-auto" />
