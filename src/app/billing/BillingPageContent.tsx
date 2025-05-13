@@ -1,4 +1,3 @@
-
 // src/app/billing/BillingPageContent.tsx
 "use client";
 
@@ -280,7 +279,7 @@ export default function BillingPageContent() {
       if (existingCustomersWithMobile.length > 0) {
         toast({
           title: "Mobile Number Exists",
-          description: "This mobile number is already associated with another customer.",
+          description: "This mobile number is already associated with another customer customer.",
           variant: "destructive",
         });
         return;
@@ -418,11 +417,8 @@ export default function BillingPageContent() {
       setOriginalOrderForEdit(null); 
       fetchProductData(); 
 
-      if (intent === 'edit' && fromOrderId) {
-        router.push(`/orders/${fromOrderId}`); 
-      } else {
-        router.replace('/billing'); 
-      }
+      // Navigate to the specific order's detail page
+      router.push(`/orders/${orderIdForResult}`);
 
     } catch (error: any) {
       console.error("Error finalizing bill:", error);
