@@ -73,6 +73,7 @@ export default function BillingPageContent() {
         try {
           const order = await getOrderById(fromOrderId);
           if (order) {
+            // Only set originalOrderForEdit if the intent is 'edit'
             if (intent === 'edit') {
               setOriginalOrderForEdit(order);
             }
@@ -116,9 +117,10 @@ export default function BillingPageContent() {
       loadOrderData();
     } else if (!fromOrderId) {
       // Clear originalOrderForEdit if navigating to /billing without fromOrder (i.e., for a new bill)
-      setOriginalOrderForEdit(null);
+      setOriginalOrderForEdit(null); 
     }
-  }, [fromOrderId, availableProducts, router, intent, toast]);
+  // Ensure intent is part of dependency array to correctly manage originalOrderForEdit
+  }, [fromOrderId, availableProducts, router, intent, toast]); 
 
 
   const handleProductAdd = (barcodeOrSn: string) => {
@@ -140,6 +142,7 @@ export default function BillingPageContent() {
     
     let stockAvailableForThisItem = productToAdd.quantity;
 
+    // If editing, the "available stock" includes what was originally in the order being edited
     if (intent === 'edit' && originalOrderForEdit) {
       const originalItemInOrder = originalOrderForEdit.items.find(item => item.productId === productToAdd.id);
       if (originalItemInOrder) {
@@ -148,7 +151,7 @@ export default function BillingPageContent() {
     }
 
 
-    if (productToAdd.quantity <= 0 && !existingItem) { 
+    if (productToAdd.quantity <= 0 && !existingItem && !(intent === 'edit' && stockAvailableForThisItem > 0)) { 
          toast({
            title: "Out of Stock",
            description: `Product "${productToAdd.name}" is out of stock.`,
@@ -168,12 +171,13 @@ export default function BillingPageContent() {
       } else {
         toast({
           title: "Max Stock Reached",
-          description: `Cannot add more of "${productToAdd.name}". Available (including original order): ${stockAvailableForThisItem}. In current DB: ${productToAdd.quantity}`,
+          description: `Cannot add more of "${productToAdd.name}". Available (including original order if editing): ${stockAvailableForThisItem}. Current DB stock: ${productToAdd.quantity}.`,
           variant: "destructive",
         });
       }
     } else { 
-      if (productToAdd.quantity > 0 || (intent === 'edit' && stockAvailableForThisItem > 0)) { // Ensure positive stock if adding new
+      // Add new if stock is available (either from DB or from original order items if editing)
+      if (stockAvailableForThisItem > 0) {
         setBillItems([...billItems, { ...productToAdd, billQuantity: 1 }]);
       } else { 
          toast({ 
@@ -198,25 +202,25 @@ export default function BillingPageContent() {
       return;
     }
     
-    let currentDBStock = productInStock.quantity;
+    let stockAvailableForThisItem = productInStock.quantity;
 
     if (intent === 'edit' && originalOrderForEdit) {
       const originalItemInOrder = originalOrderForEdit.items.find(item => item.productId === itemId);
       if (originalItemInOrder) {
-        currentDBStock += originalItemInOrder.billQuantity;
+        stockAvailableForThisItem += originalItemInOrder.billQuantity;
       }
     }
 
 
-    if (newQuantity > currentDBStock) {
+    if (newQuantity > stockAvailableForThisItem) {
       toast({
         title: "Stock Limit Exceeded",
-        description: `Cannot set quantity for "${productInStock.name}" to ${newQuantity}. Max stock available (incl. original order): ${currentDBStock}. In current DB: ${productInStock.quantity}.`,
+        description: `Cannot set quantity for "${productInStock.name}" to ${newQuantity}. Max stock available (incl. original order if editing): ${stockAvailableForThisItem}. Current DB stock: ${productInStock.quantity}.`,
         variant: "destructive",
       });
       setBillItems(
         billItems.map((item) =>
-          item.id === itemId ? { ...item, billQuantity: currentDBStock } : item
+          item.id === itemId ? { ...item, billQuantity: stockAvailableForThisItem } : item
         )
       );
       return;
@@ -323,17 +327,18 @@ export default function BillingPageContent() {
 
     let customerForOrder: Customer | null = selectedCustomer;
 
-    // If not editing, and no customer is selected, prompt.
-    // If editing, originalOrderForEdit holds the customer if one wasn't re-selected.
+    // For new bills (not edit) or re-bills (intent != edit), if no customer selected, prompt.
+    // For edit intent, customer can be optional if it was walk-in or if user cleared it.
     if (intent !== 'edit' && !customerForOrder && !searchedMobileForNotFound) { 
         toast({
             title: "Customer Not Selected",
             description: "Please search for a customer, add a new one, or finalize as walk-in if no mobile is entered.",
             variant: "destructive",
         });
-        return; // Important to return here
+        return; 
     } else if (intent === 'edit' && !customerForOrder && originalOrderForEdit) {
-        // If editing and customer was cleared but not re-selected, use original customer for the order.
+        // If editing, and the currently selected customer is null (e.g., was cleared),
+        // use the customer details from the original order being edited.
         customerForOrder = {
             id: originalOrderForEdit.customerId,
             name: originalOrderForEdit.customerName,
@@ -389,7 +394,7 @@ export default function BillingPageContent() {
           className: "bg-green-500 text-white",
           duration: 7000,
         });
-      } else {
+      } else { // Handles both new bills and re-bills (which are treated as new orders with pre-filled items)
         const itemsToDecrementStock = billItems.map(item => ({
           productId: item.id,
           quantity: item.billQuantity,
@@ -417,7 +422,6 @@ export default function BillingPageContent() {
       setOriginalOrderForEdit(null); 
       fetchProductData(); 
 
-      // Navigate to the specific order's detail page
       router.push(`/orders/${orderIdForResult}`);
 
     } catch (error: any) {
