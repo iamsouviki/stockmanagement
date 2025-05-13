@@ -1,7 +1,7 @@
 // src/app/products/page.tsx
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import ProductTable from "@/components/products/ProductTable";
 import ProductDialog from "@/components/products/ProductDialog";
@@ -9,7 +9,14 @@ import type { ProductFormData } from "@/components/products/ProductForm";
 import type { Product, Category, UserRole } from "@/types";
 import { PlusCircle, UploadCloud, Filter, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getProducts, addProduct, updateProduct, deleteProduct, getCategories } from "@/services/firebaseService";
+import { 
+  getProductsPaginated, // Use paginated fetch
+  addProduct, 
+  updateProduct, 
+  deleteProduct, 
+  getCategories,
+  getProducts // Keep for initial data or scenarios without pagination if any
+} from "@/services/firebaseService";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Link from "next/link";
@@ -18,9 +25,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import PaginationControls from "@/components/shared/PaginationControls";
+import type { QueryDocumentSnapshot } from "firebase/firestore";
 
 const pageAccessRoles: UserRole[] = ['owner', 'admin', 'employee'];
-const bulkUploadRoles: UserRole[] = ['owner', 'admin', 'employee'];
+const bulkUploadRoles: UserRole[] = ['owner', 'admin', 'employee']; // All roles can bulk upload
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -33,35 +42,127 @@ export default function ProductsPage() {
 
   // Filter states
   const [filterName, setFilterName] = useState("");
-  const [filterCategory, setFilterCategory] = useState(""); // Stores category ID
+  const [filterCategory, setFilterCategory] = useState(""); 
   const [filterSerialNumber, setFilterSerialNumber] = useState("");
   const [filterBarcode, setFilterBarcode] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        const [fetchedProducts, fetchedCategories] = await Promise.all([
-          getProducts(),
-          getCategories()
-        ]);
-        
-        const productsWithCategoryNames = fetchedProducts.map(p => ({
-          ...p,
-          categoryName: fetchedCategories.find(c => c.id === p.categoryId)?.name || 'Unknown'
-        }));
-        setProducts(productsWithCategoryNames);
-        setCategories(fetchedCategories.sort((a,b) => a.name.localeCompare(b.name)));
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        toast({ title: "Error", description: "Failed to fetch products or categories.", variant: "destructive" });
-      }
-      setIsLoading(false);
-    };
-    fetchData();
+  // Pagination states
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [currentPageFirstDoc, setCurrentPageFirstDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [currentPageLastDoc, setCurrentPageLastDoc] = useState<QueryDocumentSnapshot | null>(null);
+  const [pageHistory, setPageHistory] = useState<(QueryDocumentSnapshot | null)[]>([null]); // Stack of first docs for prev page
+  const [isFetchingPage, setIsFetchingPage] = useState(false);
+  const [hasNextPage, setHasNextPage] = useState(false);
+
+  const fetchCategoriesData = useCallback(async () => {
+    try {
+      const fetchedCategories = await getCategories();
+      setCategories(fetchedCategories.sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      toast({ title: "Error", description: "Failed to fetch categories.", variant: "destructive" });
+    }
   }, [toast]);
-  
+
+  const fetchProductsData = useCallback(async (
+    direction: 'initial' | 'next' | 'prev' | 'reset' = 'initial'
+  ) => {
+    setIsFetchingPage(true);
+    setIsLoading(direction === 'initial' || direction === 'reset'); // Full load only on initial/reset
+
+    let startAfterDoc: QueryDocumentSnapshot | null = null;
+    let endBeforeDoc: QueryDocumentSnapshot | null = null;
+    
+    if (direction === 'next') {
+      startAfterDoc = currentPageLastDoc;
+    } else if (direction === 'prev') {
+      // For 'prev', we need the first doc of the *previous* page to use as `endBefore`
+      // The `pageHistory` stores the first doc of the *current* page.
+      // So `pageHistory[pageHistory.length - 2]` is the first doc of the page we want to go to.
+      if (pageHistory.length > 1) { // Check if there's a previous page in history
+          // To go to page N-1, we need to endBefore the first doc of current page N
+          // And limitToLast
+          endBeforeDoc = currentPageFirstDoc;
+      }
+    } else if (direction === 'reset') {
+      setPageHistory([null]); // Reset history for new filter/itemsPerPage
+      setCurrentPageFirstDoc(null);
+      setCurrentPageLastDoc(null);
+    }
+
+
+    try {
+      // Fetch one more item than itemsPerPage to check if there's a next page
+      const { products: fetchedProducts, firstDoc, lastDoc } = await getProductsPaginated(
+        itemsPerPage + (direction !== 'prev' ? 1 : 0), // Fetch +1 for next, exact for prev
+        'name', 
+        'asc', 
+        startAfterDoc,
+        endBeforeDoc // Pass endBeforeDoc for 'prev'
+      );
+
+      const productsWithCategoryNames = fetchedProducts.map(p => ({
+        ...p,
+        categoryName: categories.find(c => c.id === p.categoryId)?.name || 'Unknown'
+      }));
+
+      let displayProducts = productsWithCategoryNames;
+      let newHasNextPage = false;
+
+      if (direction !== 'prev' && productsWithCategoryNames.length > itemsPerPage) {
+        displayProducts = productsWithCategoryNames.slice(0, itemsPerPage);
+        newHasNextPage = true;
+      } else {
+        newHasNextPage = false;
+      }
+      
+      setProducts(displayProducts);
+      setCurrentPageFirstDoc(firstDoc); // This is the first doc of the *current* new page
+      setCurrentPageLastDoc(lastDoc); // This is the last doc of the *current* new page
+      setHasNextPage(newHasNextPage);
+
+      if (direction === 'next' && firstDoc) {
+         setPageHistory(prev => [...prev, firstDoc]);
+      } else if (direction === 'prev') {
+         setPageHistory(prev => prev.slice(0, -1));
+      }
+      // if direction is 'initial' or 'reset', pageHistory is already [null] or set by 'reset'
+      
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      toast({ title: "Error", description: "Failed to fetch products.", variant: "destructive" });
+    }
+    setIsLoading(false);
+    setIsFetchingPage(false);
+  }, [itemsPerPage, categories, toast, currentPageLastDoc, currentPageFirstDoc, pageHistory]);
+
+  useEffect(() => {
+    fetchCategoriesData();
+  }, [fetchCategoriesData]);
+
+  useEffect(() => {
+    if (categories.length > 0) { // Fetch products only after categories are loaded
+      fetchProductsData('initial');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories, itemsPerPage]); // Rerun if itemsPerPage changes, or categories load initially
+
+  // Debounced filter application or manual trigger? For now, manual re-fetch on filter change.
+  // This simple filtering is client-side for now. Server-side filtering would be more complex with pagination.
+  const filteredProducts = useMemo(() => {
+    // If server-side filtering for pagination is implemented, this client-side filtering would be removed/changed.
+    // For now, this filters the currently fetched page of products.
+    return products.filter(product => {
+      const nameMatch = filterName ? product.name.toLowerCase().includes(filterName.toLowerCase()) : true;
+      const categoryMatch = filterCategory ? product.categoryId === filterCategory : true;
+      const serialMatch = filterSerialNumber ? product.serialNumber?.toLowerCase().includes(filterSerialNumber.toLowerCase()) : true;
+      const barcodeMatch = filterBarcode ? product.barcode?.toLowerCase().includes(filterBarcode.toLowerCase()) : true;
+      return nameMatch && categoryMatch && serialMatch && barcodeMatch;
+    }).sort((a, b) => a.name.localeCompare(b.name)); // Ensure client-side sort after filter
+  }, [products, filterName, filterCategory, filterSerialNumber, filterBarcode]);
+
+
   const handleAddProduct = () => {
     if (categories.length === 0) {
       toast({
@@ -106,7 +207,8 @@ export default function ProductsPage() {
   const handleDeleteProduct = async (productId: string) => {
     try {
       await deleteProduct(productId);
-      setProducts(products.filter((p) => p.id !== productId));
+      // Refetch current page to reflect deletion
+      fetchProductsData(pageHistory.length > 1 ? 'reset' : 'initial'); // Reset if not on first page, else initial
       toast({
         title: "Product Deleted",
         description: "The product has been successfully removed.",
@@ -125,31 +227,19 @@ export default function ProductsPage() {
     try {
       if (editingProduct) {
         await updateProduct(editingProduct.id, productData);
-        // Refetch all products to ensure data consistency and sorting after update
-        const fetchedProducts = await getProducts();
-        const productsWithCategoryNames = fetchedProducts.map(p => ({
-          ...p,
-          categoryName: categories.find(c => c.id === p.categoryId)?.name || 'Unknown'
-        }));
-        setProducts(productsWithCategoryNames);
-        toast({
-          title: "Product Updated",
-          description: `"${data.name}" has been successfully updated.`,
-        });
       } else {
-        const newProductId = await addProduct(productData);
-        const newProductEntry: Product = {
+        await addProduct({
           ...productData,
-          id: newProductId,
           imageUrl: `https://picsum.photos/seed/${encodeURIComponent(data.name)}/200/200`,
           imageHint: `${data.name.split(' ')[0].toLowerCase()} device`,
-        };
-        setProducts([newProductEntry, ...products].sort((a, b) => a.name.localeCompare(b.name)));
-        toast({
-          title: "Product Added",
-          description: `"${data.name}" has been successfully added.`,
         });
       }
+      // Refetch current page to reflect changes
+      fetchProductsData(pageHistory.length > 1 ? 'reset' : 'initial'); // Smart refetch
+      toast({
+        title: editingProduct ? "Product Updated" : "Product Added",
+        description: `"${data.name}" has been successfully ${editingProduct ? 'updated' : 'added'}.`,
+      });
       setIsDialogOpen(false);
       setEditingProduct(null);
     } catch (error) {
@@ -158,23 +248,32 @@ export default function ProductsPage() {
     }
   };
   
-  const filteredProducts = useMemo(() => {
-    return products.filter(product => {
-      const nameMatch = filterName ? product.name.toLowerCase().includes(filterName.toLowerCase()) : true;
-      const categoryMatch = filterCategory ? product.categoryId === filterCategory : true;
-      const serialMatch = filterSerialNumber ? product.serialNumber?.toLowerCase().includes(filterSerialNumber.toLowerCase()) : true;
-      const barcodeMatch = filterBarcode ? product.barcode?.toLowerCase().includes(filterBarcode.toLowerCase()) : true;
-      return nameMatch && categoryMatch && serialMatch && barcodeMatch;
-    }).sort((a, b) => a.name.localeCompare(b.name));
-  }, [products, filterName, filterCategory, filterSerialNumber, filterBarcode]);
-
   const resetFilters = () => {
     setFilterName("");
     setFilterCategory("");
     setFilterSerialNumber("");
     setFilterBarcode("");
     setShowFilters(false);
+    // TODO: Refetch products with reset filters if server-side filtering is added
   };
+
+  const handleNextPage = () => {
+    if (hasNextPage && !isFetchingPage) {
+      fetchProductsData('next');
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (pageHistory.length > 1 && !isFetchingPage) { // Can go prev if not on the first page representation
+      fetchProductsData('prev');
+    }
+  };
+  
+  const handleItemsPerPageChange = (value: string) => {
+    setItemsPerPage(Number(value));
+    fetchProductsData('reset'); // Reset pagination and fetch with new limit
+  };
+
 
   return (
     <AuthGuard allowedRoles={pageAccessRoles}>
@@ -207,7 +306,7 @@ export default function ProductsPage() {
           <Card className="shadow-md">
             <CardHeader>
               <CardTitle className="text-lg flex justify-between items-center">
-                Filter Products
+                Filter Products (Client-Side)
                 <Button variant="ghost" size="sm" onClick={resetFilters} className="text-xs">
                   <XCircle className="mr-1 h-4 w-4" /> Reset Filters
                 </Button>
@@ -258,7 +357,7 @@ export default function ProductsPage() {
           </div>
         ) : (
           <>
-            {categories.length === 0 && (
+            {categories.length === 0 && products.length === 0 && (
               <Alert variant="default" className="border-accent text-accent bg-accent/10">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 !text-accent"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
                 <AlertTitle className="font-semibold">No Categories Available</AlertTitle>
@@ -269,11 +368,27 @@ export default function ProductsPage() {
                 </AlertDescription>
               </Alert>
             )}
-            <ProductTable
-              products={filteredProducts}
-              onEdit={handleEditProduct}
-              onDelete={handleDeleteProduct}
-            />
+            <Card className="shadow-lg">
+                <CardHeader>
+                    <CardTitle className="text-lg sm:text-xl text-primary">Product List</CardTitle>
+                    <CardDescription className="text-sm sm:text-base">Overview of all products in your inventory.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0"> {/* Remove padding from CardContent if table has its own */}
+                    <ProductTable
+                    products={filteredProducts} // Use client-side filtered products for display
+                    onEdit={handleEditProduct}
+                    onDelete={handleDeleteProduct}
+                    />
+                </CardContent>
+                 <PaginationControls
+                    canGoPrev={pageHistory.length > 1 && !isFetchingPage}
+                    canGoNext={hasNextPage && !isFetchingPage}
+                    onPrevPage={handlePrevPage}
+                    onNextPage={handleNextPage}
+                    itemsPerPage={itemsPerPage}
+                    onItemsPerPageChange={handleItemsPerPageChange}
+                />
+            </Card>
           </>
         )}
 
