@@ -54,17 +54,17 @@ export function generateInvoicePdf(
   const taxRate = 0.18; // 18% GST
 
   // --- Store Header ---
-  doc.setFontSize(18); // Slightly reduced for A4
+  doc.setFontSize(18); 
   doc.setFont('helvetica', 'bold');
   doc.text(storeDetails.name, pageWidth / 2, yPos, { align: 'center' });
   yPos += 7;
-  doc.setFontSize(9); // Reduced for A4
+  doc.setFontSize(9); 
   doc.setFont('helvetica', 'normal');
   doc.text(storeDetails.storeType, pageWidth / 2, yPos, { align: 'center' });
-  yPos += 8; // Increased spacing a bit
+  yPos += 8; 
 
   // --- Store Address and Contact ---
-  doc.setFontSize(8); // Reduced for A4
+  doc.setFontSize(8); 
   const storeAddressLines = doc.splitTextToSize(storeDetails.address, contentWidth / 2 - 5);
   doc.text(storeAddressLines, margin, yPos);
   
@@ -79,18 +79,18 @@ export function generateInvoicePdf(
   yPos += 5; 
 
   // Line below store details
-  doc.setLineWidth(0.3); // Slightly thinner line
+  doc.setLineWidth(0.3); 
   doc.line(margin, yPos, pageWidth - margin, yPos);
   yPos += 6; 
 
   // --- Invoice Title ---
-  doc.setFontSize(14); // Reduced for A4
+  doc.setFontSize(14); 
   doc.setFont('helvetica', 'bold');
   doc.text('INVOICE', pageWidth / 2, yPos, { align: 'center' });
   yPos += 7; 
 
   // --- Order and Customer Info ---
-  doc.setFontSize(9); // Reduced for A4
+  doc.setFontSize(9); 
   doc.setFont('helvetica', 'normal');
   doc.text(`Order No: ${order.orderNumber}`, margin, yPos);
   doc.text(`Date: ${formatDateForPdf(order.orderDate)}`, pageWidth - margin, yPos, { align: 'right' });
@@ -103,36 +103,35 @@ export function generateInvoicePdf(
   yPos += 5;
 
   if (order.customerAddress) {
-    doc.setFontSize(8); // Smaller for address
+    doc.setFontSize(8); 
     const addressText = `Address: ${order.customerAddress}`;
-    const customerAddressLines = doc.splitTextToSize(addressText, contentWidth); // Allow full width for customer address
+    const customerAddressLines = doc.splitTextToSize(addressText, contentWidth); 
     doc.text(customerAddressLines, margin, yPos);
     const customerAddressHeight = (customerAddressLines.length * (doc.getLineHeight('helvetica', 'normal', 8) / doc.internal.scaleFactor));
     yPos += customerAddressHeight + 2;
-    doc.setFontSize(9); // Reset font size
+    doc.setFontSize(9); 
   } else {
     doc.text(`Address: N/A`, margin, yPos);
     yPos += 5;
   }
-  yPos += 2; // Extra padding before table headers
+  yPos += 2; 
 
   // --- Column definitions for A4 (in mm) ---
-  const paddingBetweenCols = 3; // mm
-  const qtyColWidth = 15; // mm
-  const priceColWidth = 25; // mm
-  const itemSubtotalColWidth = 25; // mm
-  // Remaining width for Product Name and SN/Barcode
-  const fixedColsWidth = qtyColWidth + priceColWidth + itemSubtotalColWidth + (paddingBetweenCols * 4); // 4 gaps for 5 columns
+  const paddingBetweenCols = 3; 
+  const qtyColWidth = 15; 
+  const priceColWidth = 25; 
+  const itemSubtotalColWidth = 30; // Increased width for subtotal
+  const fixedColsWidth = qtyColWidth + priceColWidth + itemSubtotalColWidth + (paddingBetweenCols * 4); 
   const remainingWidthForDynamicCols = contentWidth - fixedColsWidth;
-  const productColWidth = Math.floor(remainingWidthForDynamicCols * 0.6); // 60% for product name
-  const snBarcodeColWidth = Math.floor(remainingWidthForDynamicCols * 0.4); // 40% for SN/Barcode
+  const productColWidth = Math.floor(remainingWidthForDynamicCols * 0.6); 
+  const snBarcodeColWidth = Math.floor(remainingWidthForDynamicCols * 0.4); 
 
   const colStartX = {
     productName: margin,
     snBarcode: margin + productColWidth + paddingBetweenCols,
     qty: margin + productColWidth + paddingBetweenCols + snBarcodeColWidth + paddingBetweenCols,
     price: margin + productColWidth + paddingBetweenCols + snBarcodeColWidth + paddingBetweenCols + qtyColWidth + paddingBetweenCols,
-    subtotal: pageWidth - margin - itemSubtotalColWidth // Align from right
+    subtotal: pageWidth - margin - itemSubtotalColWidth 
   };
   
   const drawTableHeaders = () => {
@@ -141,12 +140,12 @@ export function generateInvoicePdf(
     doc.line(margin, yPos, pageWidth - margin, yPos); 
     yPos += 4; 
 
-    doc.setFontSize(9); // Header font size
+    doc.setFontSize(9); 
     doc.setFont('helvetica', 'bold');
 
     doc.text('Product Name', colStartX.productName, yPos);
     doc.text('SN/Barcode', colStartX.snBarcode, yPos);
-    doc.text('Qty', colStartX.qty + qtyColWidth / 2, yPos, { align: 'center' }); // Center align qty header
+    doc.text('Qty', colStartX.qty + qtyColWidth / 2, yPos, { align: 'center' }); 
     doc.text('Price', colStartX.price + priceColWidth, yPos, { align: 'right' });
     doc.text('Subtotal', colStartX.subtotal + itemSubtotalColWidth, yPos, { align: 'right' }); 
     
@@ -155,78 +154,77 @@ export function generateInvoicePdf(
     doc.line(margin, yPos, pageWidth - margin, yPos); 
     yPos += 3; 
     doc.setFont('helvetica', 'normal'); 
-    doc.setFontSize(8); // Item row font size
+    doc.setFontSize(8); 
   };
 
   drawTableHeaders();
 
   // --- Table Items ---
-  doc.setFontSize(8); // Set font size for item rows
+  doc.setFontSize(8); 
   order.items.forEach((item) => {
     const itemLineHeight = (doc.getLineHeight('helvetica', 'normal', 8) / doc.internal.scaleFactor);
-    // Estimate lines needed for product and SN/Barcode
     const productNameLines = doc.splitTextToSize(item.name, productColWidth);
     const snBarcodeText = item.serialNumber || item.barcode || 'N/A';
     const snBarcodeLines = doc.splitTextToSize(snBarcodeText, snBarcodeColWidth);
     const maxLinesPerItem = Math.max(productNameLines.length, snBarcodeLines.length, 1);
-    const itemBlockHeight = maxLinesPerItem * itemLineHeight + 2; // +2 for padding
+    const itemBlockHeight = maxLinesPerItem * itemLineHeight + 2; 
 
-    if (yPos + itemBlockHeight > pageHeight - (margin + 15)) { // Check if item fits, leave 15mm for footer
+    if (yPos + itemBlockHeight > pageHeight - (margin + 25)) { // Check if item fits, leave 25mm for footer and summary
       doc.addPage();
       yPos = margin;
       drawTableHeaders(); 
-      doc.setFontSize(8); // Reset font size for items on new page
+      doc.setFontSize(8); 
     }
     const currentItemY = yPos;
 
     doc.text(productNameLines, colStartX.productName, currentItemY);
     doc.text(snBarcodeLines, colStartX.snBarcode, currentItemY);
 
-    doc.text(item.billQuantity.toString(), colStartX.qty + qtyColWidth / 2, currentItemY, { align: 'center' }); // Center align qty value
-    doc.text(`₹${item.price.toFixed(2)}`, colStartX.price + priceColWidth, currentItemY, { align: 'right' });
-    doc.text(`₹{(item.price * item.billQuantity).toFixed(2)}`, colStartX.subtotal + itemSubtotalColWidth, currentItemY, { align: 'right' });
+    doc.text(item.billQuantity.toString(), colStartX.qty + qtyColWidth / 2, currentItemY, { align: 'center' }); 
+    doc.text(`Rs. ${(item.price).toFixed(2)}`, colStartX.price + priceColWidth, currentItemY, { align: 'right' });
+    doc.text(`Rs. ${(item.price * item.billQuantity).toFixed(2)}`, colStartX.subtotal + itemSubtotalColWidth, currentItemY, { align: 'right' });
     
     yPos += itemBlockHeight;
   });
 
   // --- Summary Section ---
-  // Check if summary fits on current page, otherwise new page
-  const summarySectionHeight = 35; // Approximate height needed for summary in mm
+  const summarySectionHeight = 35; 
   if (yPos + summarySectionHeight > pageHeight - margin) {
     doc.addPage();
     yPos = margin;
   }
 
   yPos += 5; 
-  const summaryTextX = pageWidth - margin - 50; // X position for summary labels
-  const summaryValueX = pageWidth - margin;    // X position for summary values (right aligned)
+  // Adjusted X positions for summary: labels aligned left, values aligned right with more space.
+  const summaryLabelX = margin + contentWidth * 0.6; // Labels start after 60% of content width
+  const summaryValueX = pageWidth - margin;         // Values align to the right margin
 
   doc.setLineWidth(0.1);
-  doc.line(margin, yPos, pageWidth - margin, yPos); // Line above summary
+  doc.line(margin, yPos, pageWidth - margin, yPos); 
   yPos += 5;
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text('Subtotal:', summaryTextX, yPos, { align: 'right' });
-  doc.text(`₹${order.subtotal.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
+  doc.text('Subtotal:', summaryLabelX, yPos, { align: 'left' });
+  doc.text(`Rs. ${order.subtotal.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
   yPos += 5;
-  doc.text(`GST (${(taxRate * 100).toFixed(0)}%):`, summaryTextX, yPos, { align: 'right' });
-  doc.text(`₹${order.taxAmount.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
+  doc.text(`GST (${(taxRate * 100).toFixed(0)}%):`, summaryLabelX, yPos, { align: 'left' });
+  doc.text(`Rs. ${order.taxAmount.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
   yPos += 5;
 
-  doc.setFontSize(10); // Larger for total
+  doc.setFontSize(10); 
   doc.setFont('helvetica', 'bold');
-  doc.line(summaryTextX - 5, yPos, summaryValueX, yPos); // Line above total
+  // Line above total amount, spanning from label start to value end
+  doc.line(summaryLabelX, yPos, summaryValueX, yPos); 
   yPos += 5;
-  doc.text('Total Amount:', summaryTextX, yPos, { align: 'right' });
-  doc.text(`₹${order.totalAmount.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
-  yPos += 10; // Space after total
+  doc.text('Total Amount:', summaryLabelX, yPos, { align: 'left' });
+  doc.text(`Rs. ${order.totalAmount.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
+  yPos += 10; 
 
   // --- Footer ---
-  const footerY = pageHeight - (margin / 2); // Position footer near bottom margin
-  doc.setFontSize(7); // Smallest font for footer
+  const footerY = pageHeight - (margin / 2); 
+  doc.setFontSize(7); 
   doc.setFont('helvetica', 'italic');
-  // Ensure footer is drawn on every page if multi-page
   const pageCount = doc.internal.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
@@ -234,8 +232,6 @@ export function generateInvoicePdf(
     doc.text('Thank you for your business! - Generated by StockPilot', pageWidth / 2, footerY, { align: 'center' });
   }
 
-
-  // Auto print
   doc.autoPrint({variant: 'non-conform'});
   doc.output('dataurlnewwindow', { filename: `StockPilot-Bill-${order.orderNumber}.pdf` });
 }
