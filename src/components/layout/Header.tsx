@@ -1,30 +1,40 @@
-// @ts-nocheck
-"use client";
+// "use client"; // Explicitly marking as client component
 
 import Link from 'next/link';
 import Logo from '@/components/icons/Logo';
 import NavItem from './NavItem';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import type * as LucideIcons from 'lucide-react'; 
-import { Menu } from 'lucide-react';
+import type * as LucideIcons from 'lucide-react'; // For using LucideIcons as a type
+import { Menu } from 'lucide-react'; // Specific icon import
 
-const navLinks: Array<{ href: string; label: string; iconName: keyof typeof LucideIcons }> = [
+// Define the type for navLink items correctly
+interface NavLinkItem {
+  href: string;
+  label: string;
+  iconName: keyof typeof LucideIcons; // Use keyof typeof to get string names of icons
+}
+
+const navLinks: NavLinkItem[] = [
   { href: '/', label: 'Dashboard', iconName: 'LayoutDashboard' },
   { href: '/products', label: 'Products', iconName: 'Boxes' },
   { href: '/categories', label: 'Categories', iconName: 'Tags' },
   { href: '/billing', label: 'Billing', iconName: 'Receipt' },
-  { href: '/orders', label: 'Orders', iconName: 'History' }, 
+  { href: '/orders', label: 'Orders', iconName: 'History' },
   { href: '/customers', label: 'Customers', iconName: 'Users' },
 ];
 
 const Header = () => {
+  // Since Header is a client component (or used in a way that its props are processed),
+  // navLinks is fine here. It passes serializable 'iconName' to NavItem.
   return (
     <header className="bg-primary shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center" aria-label="StockPilot Home">
-            <Logo className="h-8 w-auto" />
+          <Link href="/" passHref legacyBehavior>
+             <a className="flex items-center" aria-label="StockPilot Home">
+               <Logo className="h-8 w-auto" />
+             </a>
           </Link>
 
           {/* Desktop Navigation */}
