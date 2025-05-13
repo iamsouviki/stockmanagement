@@ -1,17 +1,17 @@
 // src/app/page.tsx
-'use client'; // Required for useAuth hook
+'use client'; 
 
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Boxes, Receipt, ArrowRight, Users, History, BarChart3, PieChart, Tags, SettingsIcon } from 'lucide-react'; 
+import { Boxes, Receipt, ArrowRight, Users, History, BarChart3, PieChart, Tags, UserCog } from 'lucide-react'; 
 import { Suspense } from 'react';
 import OrdersChart from '@/components/dashboard/OrdersChart';
 import StockOverviewChart from '@/components/dashboard/StockOverviewChart';
 import { Skeleton } from '@/components/ui/skeleton';
 import AuthGuard from '@/components/auth/AuthGuard'; 
 import type { UserRole } from '@/types';
-import { useAuth } from '@/hooks/useAuth'; // Import useAuth
+import { useAuth } from '@/hooks/useAuth'; 
 
 function ChartSkeleton() {
   return <Skeleton className="h-[300px] w-full rounded-lg" />;
@@ -22,11 +22,11 @@ const billingRoles: UserRole[] = ['owner', 'admin', 'employee'];
 const categoryManagementRoles: UserRole[] = ['owner', 'admin', 'employee'];
 const orderHistoryRoles: UserRole[] = ['owner', 'admin', 'employee'];
 const customerManagementRoles: UserRole[] = ['owner', 'admin', 'employee'];
-const settingsRoles: UserRole[] = ['owner', 'admin'];
+const userManagementRoles: UserRole[] = ['owner', 'admin'];
 
 
 export default function DashboardPage() {
-  const { userProfile, isLoading } = useAuth(); // Get userProfile
+  const { userProfile, isLoading } = useAuth(); 
 
   const welcomeMessage = isLoading 
     ? "Loading..." 
@@ -166,19 +166,19 @@ export default function DashboardPage() {
             </Card>
           </AuthGuard>
 
-          <AuthGuard allowedRoles={settingsRoles} redirectPath='/login'>
+          <AuthGuard allowedRoles={userManagementRoles} redirectPath='/login'>
             <Card className="shadow-lg hover:shadow-xl transition-shadow sm:col-span-2 lg:col-span-2 xl:col-span-2"> 
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-xl sm:text-2xl font-semibold">User Settings</CardTitle>
-                <SettingsIcon className="h-7 w-7 sm:h-8 sm:w-8 text-accent" />
+                <CardTitle className="text-xl sm:text-2xl font-semibold">User Management</CardTitle>
+                <UserCog className="h-7 w-7 sm:h-8 sm:w-8 text-accent" />
               </CardHeader>
               <CardContent>
                 <CardDescription className="mb-3 sm:mb-4 text-sm sm:text-base">
-                  Manage user accounts and logout from your session.
+                  Manage user accounts, roles, and logout from your session.
                 </CardDescription>
                 <Button asChild variant="default" className="w-full sm:w-auto bg-primary hover:bg-primary/90">
-                  <Link href="/settings">
-                    Go to User Settings <ArrowRight className="ml-2 h-4 w-4" />
+                  <Link href="/settings/user-management">
+                    Go to User Management <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
               </CardContent>

@@ -6,18 +6,18 @@ import Logo from '@/components/icons/Logo';
 import NavItem from './NavItem';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Menu, Home, Boxes, Receipt, History, Users, Tags, LogIn, LogOut, SettingsIcon, UserCog } from 'lucide-react'; // Added UserCog for potential admin icon
+import { Menu, Home, Boxes, Receipt, History, Users, Tags, LogIn, LogOut, UserCog } from 'lucide-react'; 
 import type { LucideIcon } from 'lucide-react';
 import { usePathname } from 'next/navigation'; 
 import { useState, useEffect } from 'react'; 
 import { useAuth } from '@/hooks/useAuth';
-import type { UserRole } from '@/types'; // Import UserRole
+import type { UserRole } from '@/types'; 
 
 interface NavLink {
   href: string;
   label: string;
   icon: LucideIcon;
-  roles?: UserRole[]; // Use the imported UserRole type
+  roles?: UserRole[]; 
 }
 
 const navLinks: NavLink[] = [
@@ -27,7 +27,7 @@ const navLinks: NavLink[] = [
   { href: '/billing', label: 'Billing', icon: Receipt, roles: ['owner', 'admin', 'employee'] },
   { href: '/orders', label: 'Orders', icon: History, roles: ['owner', 'admin', 'employee'] },
   { href: '/customers', label: 'Customers', icon: Users, roles: ['owner', 'admin', 'employee'] },
-  { href: '/settings', label: 'Settings', icon: SettingsIcon, roles: ['owner', 'admin'] }, // Admins can access settings for user management
+  { href: '/settings/user-management', label: 'Manage Users', icon: UserCog, roles: ['owner', 'admin'] },
 ];
 
 export default function Header() {
@@ -46,7 +46,7 @@ export default function Header() {
           )
         );
       } else {
-        setVisibleNavLinks(navLinks.filter(link => !link.roles || link.href === '/')); // Show only public links or dashboard if no roles defined
+        setVisibleNavLinks(navLinks.filter(link => !link.roles || link.href === '/')); 
       }
     }
   }, [currentUser, userProfile, isLoading]);
@@ -92,13 +92,12 @@ export default function Header() {
           <div className="md:hidden flex items-center">
             {isLoading ? (
                  <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/20 h-9 w-9 sm:h-10 sm:w-10" disabled></Button> 
-            ) : currentUser && ( // Show logout only if user is logged in
+            ) : currentUser && ( 
               <Button variant="ghost" size="icon" onClick={logout} className="text-primary-foreground hover:bg-primary-foreground/20 h-9 w-9 sm:h-10 sm:w-10 mr-1">
                 <LogOut className="h-5 w-5 sm:h-6 sm:w-6" />
                 <span className="sr-only">Logout</span>
               </Button>
             ) 
-            // Login button for mobile is implicitly handled by redirection if not authenticated
             }
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
@@ -124,7 +123,6 @@ export default function Header() {
                         <NavItem href={link.href} label={link.label} icon={link.icon} isMobile currentPathname={pathname} onClick={() => setIsMobileMenuOpen(false)}/>
                      </SheetTrigger>
                   ))}
-                   {/* Mobile Auth Buttons - shown if not loading */}
                   {!isLoading && (
                     <div className="mt-auto pt-4 border-t border-primary-foreground/20">
                       {currentUser ? (

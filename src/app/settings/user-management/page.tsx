@@ -63,7 +63,7 @@ export default function UserManagementPage() {
         toast({ title: "Action Not Allowed", description: "Owner accounts cannot be modified from this panel.", variant: "default" });
         return;
     }
-    if (currentUserProfile?.role === 'admin' && user.role === 'owner') { // Should be caught by above, but defensive
+    if (currentUserProfile?.role === 'admin' && user.role === 'owner') { 
         toast({ title: "Permission Denied", description: "Admins cannot edit owner accounts.", variant: "destructive" });
         return;
     }
@@ -105,7 +105,7 @@ export default function UserManagementPage() {
 
   const handleSubmitUser = async (data: UserManagementFormData) => {
     try {
-      if (editingUser) { // Editing existing user
+      if (editingUser) { 
         if (editingUser.id === currentUserProfile?.id && data.role !== editingUser.role) {
              toast({ title: "Action Not Allowed", description: "You cannot change your own role.", variant: "destructive"});
              return;
@@ -114,9 +114,9 @@ export default function UserManagementPage() {
             toast({ title: "Action Not Allowed", description: "Owner role cannot be changed.", variant: "destructive" });
             return;
         }
-        // Admin specific rules for editing
+        
         if (currentUserProfile?.role === 'admin') {
-            if (editingUser.role === 'owner') { // Should not reach here if UI prevents opening dialog
+            if (editingUser.role === 'owner') { 
                  toast({ title: "Permission Denied", description: "Admins cannot modify owner accounts.", variant: "destructive" });
                  return;
             }
@@ -127,20 +127,20 @@ export default function UserManagementPage() {
             } else if (editingUser.role === 'employee' && data.role === 'employee') {
                 // Fine, Admin editing an Employee (no role change).
             }
-             else { // Any other role assignment by Admin is disallowed
+             else { 
                 toast({ title: "Permission Denied", description: "Admins can only demote other Admins to Employee, or manage Employee accounts.", variant: "destructive" });
                 return;
             }
         }
-        // Owner specific rules for editing
+        
         if (currentUserProfile?.role === 'owner') {
-            if (editingUser.role === 'owner' && data.role !== 'owner') { // Should not reach here
+            if (editingUser.role === 'owner' && data.role !== 'owner') { 
                 toast({ title: "Action Not Allowed", description: "Owner role cannot be changed.", variant: "destructive" });
                 return;
             }
             if ((editingUser.role === 'admin' || editingUser.role === 'employee') && (data.role === 'admin' || data.role === 'employee') ) {
                 // Fine, Owner is changing Admin to Employee or vice-versa, or keeping same.
-            } else if (data.role === 'owner') { // Owner trying to make someone else owner via edit
+            } else if (data.role === 'owner') { 
                  toast({ title: "Action Not Allowed", description: "Cannot assign Owner role via edit. This is a restricted operation.", variant: "destructive"});
                  return;
             }
@@ -156,7 +156,7 @@ export default function UserManagementPage() {
           title: "User Updated",
           description: `User "${data.displayName}" has been successfully updated.`,
         });
-      } else { // Adding new user
+      } else { 
         if (!data.email || !data.password) {
           toast({ title: "Missing Fields", description: "Email and password are required for new users.", variant: "destructive" });
           return;
@@ -167,13 +167,11 @@ export default function UserManagementPage() {
                  toast({ title: "Action Not Allowed", description: "Cannot create new Owner directly. Assign Admin or Employee role.", variant: "destructive" });
                  return;
             }
-             // Owner can create Admin or Employee
         } else if (currentUserProfile?.role === 'admin') {
             if (data.role === 'owner' || data.role === 'admin') {
                 toast({ title: "Permission Denied", description: "Admins can only create Employee accounts.", variant: "destructive" });
                 return;
             }
-            // Admin can only create Employee
         }
 
         const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
@@ -224,8 +222,8 @@ export default function UserManagementPage() {
     <AuthGuard allowedRoles={allowedAccessRoles}>
       <div className="space-y-6">
         <Button variant="outline" size="sm" asChild>
-          <Link href="/settings">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Settings
+          <Link href="/">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
           </Link>
         </Button>
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
