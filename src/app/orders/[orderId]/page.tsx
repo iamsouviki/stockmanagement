@@ -1,11 +1,10 @@
-import { NextPage } from 'next';
 import { getOrders } from '@/services/firebaseService';
 import OrderDetailPageClient from './OrderDetailPageClient';
-import type { Metadata, ResolvingMetadata } from 'next';
 import { Suspense } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { Metadata, ResolvingMetadata } from 'next';
 
-// Generate static params
+// ✅ generateStaticParams (no change needed)
 export async function generateStaticParams(): Promise<{ orderId: string }[]> {
   try {
     const orders = await getOrders();
@@ -18,20 +17,19 @@ export async function generateStaticParams(): Promise<{ orderId: string }[]> {
   }
 }
 
-// Generate metadata
+// ✅ generateMetadata (params must be async and destructured properly)
 export async function generateMetadata(
-  // Use type assertion to bypass params mismatch
-  { params }: { params: { orderId: string } } | any,
-  parent: ResolvingMetadata
+  { params }: { params: { orderId: string } },
+  _parent: ResolvingMetadata
 ): Promise<Metadata> {
-  const orderId = params.orderId as string;
+  const orderId = params.orderId;
   return {
-    title: `Order Details - ${orderId ? orderId.substring(0, 6) + '...' : 'Order'}`,
-    description: `View details for order ${orderId || ''}`,
+    title: `Order Details - ${orderId?.substring(0, 6)}...`,
+    description: `View details for order ${orderId}`,
   };
 }
 
-// Skeleton for Suspense fallback
+// ✅ Loading skeleton for fallback
 function OrderDetailLoadingSkeleton() {
   return (
     <div className="space-y-4 p-4">
@@ -44,14 +42,17 @@ function OrderDetailLoadingSkeleton() {
   );
 }
 
-// Define the page with type assertion
-const OrderDetailPage: NextPage<{ params: { orderId: string } } | any> = ({ params }) => {
-  const orderId = params.orderId as string;
+// ✅ Page component MUST be async and receive `params` properly
+export default async function OrderDetailPage({
+  params,
+}: {
+  params: { orderId: string };
+}) {
+  const orderId = params.orderId;
+
   return (
     <Suspense fallback={<OrderDetailLoadingSkeleton />}>
       <OrderDetailPageClient orderId={orderId} />
     </Suspense>
   );
-};
-
-export default OrderDetailPage;
+}
