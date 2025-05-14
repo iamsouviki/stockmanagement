@@ -1,3 +1,4 @@
+
 // src/components/billing/BillSummaryCard.tsx
 "use client";
 
@@ -61,3 +62,4 @@ const BillSummaryCard: React.FC<BillSummaryCardProps> = ({ items, onFinalizeBill
 };
 
 export default BillSummaryCard;
+

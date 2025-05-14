@@ -8,20 +8,23 @@ import BarcodeEntry from '@/components/billing/BarcodeEntry';
 import BillItemsList from '@/components/billing/BillItemsList';
 import BillSummaryCard from '@/components/billing/BillSummaryCard';
 import type { Product, BillItem, OrderItemData, Order, Customer } from '@/types';
-import { WALK_IN_CUSTOMER_ID } from '@/types'; 
+import { WALK_IN_CUSTOMER_ID } from '@/types'; // Import WALK_IN_CUSTOMER_ID
 import type { CustomerFormData } from '@/components/customers/CustomerForm';
 import CustomerDialog from '@/components/customers/CustomerDialog';
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { UserSearch, PlusCircle, Info, Loader2 } from "lucide-react";
+// import jsPDF from 'jspdf'; // No longer directly used here
+// import { format } from 'date-fns'; // No longer directly used here for PDF
 import { getProducts, addOrderAndDecrementStock, getOrder as getOrderById, findCustomerByMobile, getCustomer as getCustomerById, addCustomer, updateOrderAndAdjustStock } from '@/services/firebaseService';
 import { storeDetails } from '@/config/storeDetails';
+// import { Timestamp } from 'firebase/firestore'; // No longer directly used here for PDF
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import BillingPageLoadingSkeleton from '@/components/billing/BillingPageLoadingSkeleton';
-import { generateInvoicePdf } from '@/lib/pdfGenerator'; 
+import { generateInvoicePdf } from '@/lib/pdfGenerator'; // Import the new PDF utility
 import type { Timestamp } from 'firebase/firestore';
 
 export default function BillingPageContent() {
