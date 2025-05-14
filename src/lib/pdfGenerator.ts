@@ -108,7 +108,7 @@ export function generateInvoicePdf(
     const addressText = `Address: ${order.customerAddress}`;
     const customerAddressLines = doc.splitTextToSize(addressText, contentWidth); 
     doc.text(customerAddressLines, margin, yPos);
-    // doc.setFontSize(8); // Already set
+    doc.setFontSize(8); 
     const customerAddressHeight = customerAddressLines.length * doc.getLineHeight();
     yPos += customerAddressHeight + 2;
     doc.setFontSize(9); 
@@ -119,11 +119,11 @@ export function generateInvoicePdf(
   yPos += 2; 
 
   // --- Column definitions for A4 (in mm) ---
-  const productColWidth = contentWidth * 0.28; // Adjusted from 0.28
-  const snBarcodeColWidth = contentWidth * 0.18; // Adjusted from 0.18
+  const productColWidth = contentWidth * 0.28;
+  const snBarcodeColWidth = contentWidth * 0.18;
   const qtyColWidth = contentWidth * 0.08;
   const priceColWidth = contentWidth * 0.23; 
-  const itemSubtotalColWidth = contentWidth * 0.23; // Adjusted from 0.23
+  const itemSubtotalColWidth = contentWidth * 0.23;
   
   const colStartX = {
     productName: margin,
@@ -145,8 +145,8 @@ export function generateInvoicePdf(
     doc.text('Product Name', colStartX.productName + 1, yPos);
     doc.text('SN/Barcode', colStartX.snBarcode + 1, yPos);
     doc.text('Qty', colStartX.qty + qtyColWidth / 2, yPos, { align: 'center' }); 
-    doc.text('Price', colStartX.price + priceColWidth - 1.5, yPos, { align: 'right' }); // Adjusted x-pos
-    doc.text('Subtotal', colStartX.subtotal + itemSubtotalColWidth - 1.5, yPos, { align: 'right' }); // Adjusted x-pos
+    doc.text('Price', colStartX.price + priceColWidth - 1, yPos, { align: 'right' });
+    doc.text('Subtotal', colStartX.subtotal + itemSubtotalColWidth - 1, yPos, { align: 'right' });
     
     yPos += doc.getLineHeight(); 
     yPos += 2; 
@@ -165,7 +165,7 @@ export function generateInvoicePdf(
     const snBarcodeText = item.serialNumber || item.barcode || 'N/A';
     const snBarcodeLines = doc.splitTextToSize(snBarcodeText, snBarcodeColWidth - 2); 
     const maxLinesPerItem = Math.max(productNameLines.length, snBarcodeLines.length, 1);
-    const itemBlockHeight = maxLinesPerItem * itemLineHeight + 1; // Reduced padding from +2 to +1
+    const itemBlockHeight = maxLinesPerItem * itemLineHeight + 2; 
 
     if (yPos + itemBlockHeight > pageHeight - (margin + 35)) { 
       doc.addPage();
@@ -173,18 +173,15 @@ export function generateInvoicePdf(
       drawTableHeaders(); 
     }
     const currentItemY = yPos;
-    doc.setFontSize(8); 
+    doc.setFontSize(8); // Set font size for product name and SN/Barcode
     doc.setFont('helvetica', 'normal');
     doc.text(productNameLines, colStartX.productName + 1, currentItemY); 
     doc.text(snBarcodeLines, colStartX.snBarcode + 1, currentItemY); 
 
-    doc.setFontSize(7.5); 
-    const priceString = `\u20B9${(item.price).toFixed(2)}`;
-    const subtotalString = `\u20B9${(item.price * item.billQuantity).toFixed(2)}`;
-
+    doc.setFontSize(7.5); // Slightly smaller font for Qty, Price, Subtotal
     doc.text(item.billQuantity.toString(), colStartX.qty + qtyColWidth / 2, currentItemY, { align: 'center' }); 
-    doc.text(priceString, colStartX.price + priceColWidth - 3, currentItemY, { align: 'right' }); // Moved further left slightly
-    doc.text(subtotalString, colStartX.subtotal + itemSubtotalColWidth - 3, currentItemY, { align: 'right' }); // Moved further left slightly
+    doc.text(`\u20B9${(item.price).toFixed(2)}`, colStartX.price + priceColWidth - 2.5 , currentItemY, { align: 'right' });
+    doc.text(`\u20B9${(item.price * item.billQuantity).toFixed(2)}`, colStartX.subtotal + itemSubtotalColWidth - 2.5, currentItemY, { align: 'right' });
     
     yPos += itemBlockHeight;
   });
@@ -198,7 +195,7 @@ export function generateInvoicePdf(
 
   yPos += 5; 
   const summaryLabelX = margin + contentWidth * 0.55; 
-  const summaryValueX = pageWidth - margin - 3; // Increased padding from right edge for summary values
+  const summaryValueX = pageWidth - margin - 2;
 
   doc.setLineWidth(0.1);
   doc.line(margin, yPos, pageWidth - margin, yPos); 
