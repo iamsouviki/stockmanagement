@@ -1,71 +1,19 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users Collection
-    // Allow users to read their own profile.
-    // Allow authenticated users to list users (e.g., for AuthContext owner check, or user management by owner/admin).
-    // Allow creation of a user profile if the user is creating their own.
-    // Allow owners to update any user profile (except another owner's role directly if restricted).
-    // Allow admins to update employee profiles or demote other admins.
-    // Allow users to update their own profile (e.g., display name, mobile, but not role).
-    // Allow owners to delete non-owner user profiles.
-    // Allow admins to delete employee profiles.
-    match /users/{userId} {
-      allow read: if request.auth != null; // Allows AuthContext to check for owner and user profile existence
-      allow create: if request.auth != null && request.auth.uid == userId; // User creating their own profile
-      allow update: if request.auth != null && (
-                       request.auth.uid == userId || // User updating their own profile
-                       (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner' && resource.data.role != 'owner') || // Owner updating non-owner
-                       (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' && resource.data.role == 'employee') // Admin updating employee
-                     );
-      allow delete: if request.auth != null && (
-                       (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner' && resource.data.role != 'owner') || // Owner deleting non-owner
-                       (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' && resource.data.role == 'employee')    // Admin deleting employee
-                     );
-    }
-
-    // Categories Collection
-    // Allow all authenticated users to read categories.
-    // Allow owner, admin, or employee to write (create, update, delete) categories.
-    match /categories/{categoryId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
-    }
-
-    // Products Collection
-    // Allow all authenticated users to read products.
-    // Allow owner, admin, or employee to write products.
-    match /products/{productId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
-    }
-
-    // Customers Collection
-    // Allow all authenticated users to read customers.
-    // Allow owner, admin, or employee to write customers.
-    match /customers/{customerId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
-    }
-
-    // Orders Collection
-    // Allow all authenticated users to read orders (for history).
-    // Allow owner, admin, or employee to create orders.
-    // Allow only owners to update orders.
-    // Deletion of orders is generally disallowed for data integrity.
-    match /orders/{orderId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && 
-                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
-      allow update: if request.auth != null && 
-                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
-      allow delete: if false; // Typically, orders should not be deleted.
+    // This rule allows anyone with your Firestore database reference to view, edit,
+    // and delete all data in your Firestore database. It is useful for getting
+    // started, but it is configured to expire after 30 days because it
+    // leaves your app open to attackers. At that time, all client
+    // requests to your Firestore database will be denied.
+    //
+    // Make sure to write security rules for your app before that time, or else
+    // all client requests to your Firestore database will be denied until you Update
+    // your rules
+    match /{document=**} {
+      allow read, write: if request.time < timestamp.date(2025, 6, 12);
     }
   }
 }
