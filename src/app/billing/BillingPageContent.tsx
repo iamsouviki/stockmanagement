@@ -25,14 +25,12 @@ import { generateInvoicePdf } from '@/lib/pdfGenerator';
 
 export default function BillingPageContent() {
   const router = useRouter();
-  const searchParams = useSearchParams(); // Hook is called here
+  const searchParams = useSearchParams(); 
 
-  // State for parameters from URL
   const [paramFromOrder, setParamFromOrder] = useState<string | null>(null);
   const [paramIntent, setParamIntent] = useState<string | null>(null);
   const [areParamsReady, setAreParamsReady] = useState(false);
 
-  // Bill-specific state
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
@@ -48,21 +46,12 @@ export default function BillingPageContent() {
 
   const { toast } = useToast();
 
-  // Effect to process searchParams once they are available
   useEffect(() => {
-    // Check if searchParams is not null and has been initialized
-    // For static export, searchParams might be initially empty or null on server, then populated on client
-    if (searchParams.toString()) { // Check if searchParams has any value
+    if (searchParams.toString() || (!searchParams.get('fromOrder') && !searchParams.get('intent'))) {
       setParamFromOrder(searchParams.get('fromOrder'));
       setParamIntent(searchParams.get('intent'));
       setAreParamsReady(true);
-    } else if (!searchParams.get('fromOrder') && !searchParams.get('intent')) {
-      // If there are no params in the URL, we can consider params ready
-      setAreParamsReady(true);
     }
-    // If searchParams.toString() is empty but we expect params,
-    // areParamsReady remains false until client-side JS populates searchParams.
-    // The Suspense boundary in page.tsx should handle this.
   }, [searchParams]);
   
 
@@ -90,7 +79,7 @@ export default function BillingPageContent() {
   }, [fetchProductData]);
 
   useEffect(() => {
-    if (!areParamsReady) return; // Wait for params to be processed
+    if (!areParamsReady) return; 
 
     if (paramFromOrder && availableProducts.length > 0) {
       const loadOrderData = async () => {
@@ -103,18 +92,25 @@ export default function BillingPageContent() {
             }
             const itemsForBill: BillItem[] = order.items.map(item => {
               const productDetails = availableProducts.find(p => p.id === item.productId);
+              
+              const preliminaryImageUrl = productDetails?.imageUrl ?? item.imageUrl;
+              const finalImageUrl = preliminaryImageUrl === null ? undefined : preliminaryImageUrl;
+
+              const preliminaryImageHint = productDetails?.imageHint ?? item.imageHint;
+              const finalImageHint = preliminaryImageHint === null ? undefined : preliminaryImageHint;
+
               return {
-                ...item, // Spread OrderItemData properties
-                id: item.productId, // Override id to be productId for BillItem consistency
+                ...item, 
+                id: item.productId, 
                 name: productDetails?.name || item.name,
                 price: productDetails?.price || item.price,
-                quantity: productDetails?.quantity ?? 0, // Stock quantity from Product
-                billQuantity: item.billQuantity, // Quantity being billed
+                quantity: productDetails?.quantity ?? 0, 
+                billQuantity: item.billQuantity, 
                 categoryId: productDetails?.categoryId ?? '',
                 serialNumber: item.serialNumber || productDetails?.serialNumber || '',
-                barcode: item.barcode || productDetails?.barcode || '', // Ensure barcode is string
-                imageUrl: productDetails?.imageUrl ?? (item.imageUrl === null ? undefined : item.imageUrl),
-                imageHint: productDetails?.imageHint ?? (item.imageHint === null ? undefined : item.imageHint),
+                barcode: item.barcode || productDetails?.barcode || '',
+                imageUrl: finalImageUrl,
+                imageHint: finalImageHint,
               };
             });
             setBillItems(itemsForBill);
@@ -139,7 +135,7 @@ export default function BillingPageContent() {
         setIsLoadingOrderData(false);
       };
       loadOrderData();
-    } else if (!paramFromOrder) { // No fromOrder, new bill
+    } else if (!paramFromOrder) { 
       setOriginalOrderForEdit(null); 
       setBillItems([]);
       setSelectedCustomer(null);
@@ -149,7 +145,7 @@ export default function BillingPageContent() {
 
 
   const handleProductAdd = (barcodeOrSn: string) => {
-    if (!areParamsReady) return; // Ensure params (and thus intent) are processed
+    if (!areParamsReady) return; 
 
     const productToAdd = availableProducts.find(
       (p) => p.barcode === barcodeOrSn || p.serialNumber === barcodeOrSn
@@ -316,7 +312,7 @@ export default function BillingPageContent() {
 
       const customerData = {
         ...data,
-        imageUrl: `https://placehold.co/200x200.png`, // Placeholder image
+        imageUrl: `https://placehold.co/200x200.png`, 
         imageHint: "person avatar",
       };
       const newCustomerId = await addCustomer(customerData);
@@ -367,8 +363,8 @@ export default function BillingPageContent() {
       name: item.name,
       price: item.price,
       billQuantity: item.billQuantity,
-      imageUrl: item.imageUrl || null,
-      imageHint: item.imageHint || null,
+      imageUrl: item.imageUrl === undefined ? null : item.imageUrl, // Convert undefined back to null for DB
+      imageHint: item.imageHint === undefined ? null : item.imageHint, // Convert undefined back to null for DB
       serialNumber: item.serialNumber || null,
       barcode: item.barcode || null,
     }));
@@ -384,7 +380,6 @@ export default function BillingPageContent() {
       customerMobile = selectedCustomer.mobileNumber;
       customerAddress = selectedCustomer.address || null;
     } else if (paramIntent === 'edit' && originalOrderForEdit && originalOrderForEdit.customerName !== "Walk-in Customer") {
-      // If editing and no new customer is selected, retain original customer from the order being edited
       customerId = originalOrderForEdit.customerId;
       customerName = originalOrderForEdit.customerName;
       customerMobile = originalOrderForEdit.customerMobile;
@@ -597,5 +592,7 @@ export default function BillingPageContent() {
     </div>
   );
 }
+
+    
 
     
