@@ -257,6 +257,19 @@ export const addOrderAndDecrementStock = async (
   return newOrderRef.id;
 };
 
+// Interface for the data payload when updating an order
+interface OrderUpdateData {
+  customerId: string;
+  customerName: string;
+  customerMobile: string;
+  customerAddress: string | null | undefined;
+  items: OrderItemData[];
+  subtotal: number;
+  taxAmount: number;
+  totalAmount: number;
+  updatedAt: FieldValue; // Specifically FieldValue for the update
+}
+
 
 export const updateOrderAndAdjustStock = async (
   orderId: string,
@@ -268,22 +281,16 @@ export const updateOrderAndAdjustStock = async (
 
   const stockAdjustments = new Map<string, number>();
 
-  // Calculate how much each item from original order contributed to being "billed"
   originalOrder.items.forEach(originalItem => {
     stockAdjustments.set(originalItem.productId, (stockAdjustments.get(originalItem.productId) || 0) + originalItem.billQuantity);
   });
 
-  // Calculate how much each item from updated order will be "billed"
   updatedOrderPayload.items.forEach(updatedItem => {
     stockAdjustments.set(updatedItem.productId, (stockAdjustments.get(updatedItem.productId) || 0) - updatedItem.billQuantity);
   });
   
-  // stockAdjustments now holds the *net change* to apply to product stock.
-  // Positive value means stock should increase (item returned/quantity reduced).
-  // Negative value means stock should decrease (item added/quantity increased).
-
   const productUpdatePromises = Array.from(stockAdjustments.entries()).map(async ([productId, netStockChangeToApply]) => {
-    if (netStockChangeToApply === 0) return; // No change for this product's stock
+    if (netStockChangeToApply === 0) return;
 
     const productRef = doc(db, 'products', productId);
     try {
@@ -300,32 +307,25 @@ export const updateOrderAndAdjustStock = async (
         }
         batch.update(productRef, { quantity: newDBStock, updatedAt: serverTimestamp() });
       } else {
-        // This case should ideally not happen if products are managed correctly.
-        // If netStockChangeToApply > 0, it means returning stock for a product that doesn't exist.
-        // If netStockChangeToApply < 0, it means taking stock for a product that doesn't exist.
         console.warn(`Product ID ${productId} not found during stock adjustment for order update. Stock change of ${netStockChangeToApply} ignored.`);
-        if (netStockChangeToApply < 0) { // Trying to decrement stock for a non-existent product
+        if (netStockChangeToApply < 0) {
             throw new Error(`Cannot fulfill order: Product ID ${productId} not found in inventory.`);
         }
       }
     } catch (error) {
       console.error(`Error preparing stock update for product ${productId}:`, error);
-      throw error; // Re-throw to halt the batch commit if critical
+      throw error; 
     }
   });
 
   try {
-    await Promise.all(productUpdatePromises); // Validate all stock changes before committing
+    await Promise.all(productUpdatePromises); 
   } catch (error) {
     console.error("Failed during product stock validation for update:", error);
-    throw error; // Halt if any product stock adjustment fails
+    throw error; 
   }
   
-  // Prepare the order document update, keeping original orderNumber and orderDate
-  const finalOrderUpdateData: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'items'> & { 
-    items: OrderItemData[]; 
-    updatedAt: FieldValue 
-  } = {
+  const finalOrderUpdateData: OrderUpdateData = {
     customerId: updatedOrderPayload.customerId,
     customerName: updatedOrderPayload.customerName,
     customerMobile: updatedOrderPayload.customerMobile,
@@ -342,4 +342,3 @@ export const updateOrderAndAdjustStock = async (
   await batch.commit();
   return orderId;
 };
-
