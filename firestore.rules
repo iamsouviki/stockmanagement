@@ -3,53 +3,17 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    match /users/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-
-      // User can write to their own document under specific conditions:
-      // 1. If it's a 'create' operation, the incoming data must NOT contain a 'role' field.
-      //    (Role is assumed to be set by trusted logic, e.g., AuthProvider on first sign-in).
-      // 2. If it's an 'update' operation, the 'role' field in the document must NOT change.
-      //    (User can update other profile fields, but not their own role).
-      allow write: if request.auth != null && request.auth.uid == uid &&
-                      ( (request.method == 'create' && !('role' in request.resource.data)) ||
-                        (request.method == 'update' && request.resource.data.role == resource.data.role) );
-    }
-
-    match /categories/{categoryId} {
-      // All authenticated users can read categories
-      allow read: if request.auth != null;
-      // Owner and Employee can create, update, delete categories
-      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'employee'];
-    }
-
-    match /products/{productId} {
-      // All authenticated users can read products
-      allow read: if request.auth != null;
-      // Owner and Employee can create, update, delete products
-      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'employee'];
-    }
-
-    match /customers/{customerId} {
-      // All authenticated users can read customers
-      allow read: if request.auth != null;
-      // Owner and Employee can create, update, delete customers
-      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'employee'];
-    }
-
-    // Rules for the 'orders' collection and its documents
-    match /orders/{orderId} {
-      // .read in user JSON covers both 'get' (single doc) and 'list' (collection query)
-      allow read: if request.auth != null;
-
-      // .create from user JSON for /orders
-      allow create: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'employee'];
-
-      // .update from user JSON for /orders/$orderId
-      allow update: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
-
-      // .delete from user JSON for /orders/$orderId
-      allow delete: if false; // Explicitly disallow deletion of orders
+    // This rule allows anyone with your Firestore database reference to view, edit,
+    // and delete all data in your Firestore database. It is useful for getting
+    // started, but it is configured to expire after 30 days because it
+    // leaves your app open to attackers. At that time, all client
+    // requests to your Firestore database will be denied.
+    //
+    // Make sure to write security rules for your app before that time, or else
+    // all client requests to your Firestore database will be denied until you Update
+    // your rules
+    match /{document=**} {
+      allow read, write: if request.time < timestamp.date(2025, 6, 12);
     }
   }
 }
