@@ -6,14 +6,9 @@ import type { Metadata, ResolvingMetadata } from 'next';
 import { Suspense } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// Define an explicit interface for the route parameters
-interface DynamicPageParams {
-  orderId: string;
-}
-
 // This function tells Next.js which params to generate statically.
-// It should return an array of objects matching DynamicPageParams.
-export async function generateStaticParams(): Promise<DynamicPageParams[]> {
+// The return type is now Promise<Array<{ orderId: string }>>
+export async function generateStaticParams(): Promise<{ orderId: string }[]> {
   try {
     const orders = await getOrders();
     return orders.map((order) => ({
@@ -21,14 +16,14 @@ export async function generateStaticParams(): Promise<DynamicPageParams[]> {
     }));
   } catch (error) {
     console.error("Failed to generate static params for orders:", error);
-    return [];
+    return []; // Return empty array on error to avoid build failure
   }
 }
 
 // This function generates metadata for each statically generated page.
-// The props for this function will include 'params' of type DynamicPageParams.
+// The params type is now inlined as { orderId: string }
 export async function generateMetadata(
-  { params }: { params: DynamicPageParams },
+  { params }: { params: { orderId: string } },
   parent: ResolvingMetadata
 ): Promise<Metadata> {
   const orderId = params.orderId;
@@ -55,8 +50,8 @@ function OrderDetailLoadingSkeleton() {
   }
 
 // The Page component itself.
-// Its props will include 'params' of type DynamicPageParams.
-export default function OrderDetailPage({ params }: { params: DynamicPageParams }) {
+// The params type is now inlined as { orderId: string }
+export default function OrderDetailPage({ params }: { params: { orderId: string } }) {
   return (
     <Suspense fallback={<OrderDetailLoadingSkeleton />}>
       <OrderDetailPageClient orderId={params.orderId} />

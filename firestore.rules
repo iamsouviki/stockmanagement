@@ -4,53 +4,65 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users Collection
+    // Users collection:
     // - Authenticated users can read their own profile.
-    // - Authenticated users can list users (e.g., for AuthContext owner check, or user management page if allowed by UI).
-    // - Users can create their own profile document upon signup (UID must match).
-    // - Users can update their own profile (excluding role, unless an owner/admin logic is implemented server-side or via specific rules).
-    // - Only owners can delete user profiles (excluding their own, handled by client logic).
+    // - Authenticated users can create their own profile (e.g., on first sign-up).
+    // - Authenticated users can update their own profile (excluding role).
+    // - Only 'owner' can delete user profiles (except their own).
+    // - Allow any authenticated user to list/query users (e.g., for AuthContext owner check, user management page by admin/owner).
     match /users/{userId} {
-      allow read: if request.auth != null; // Allows get and list for authenticated users
+      allow read: if request.auth != null;
       allow create: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId && !(request.resource.data.role is string && request.resource.data.role != resource.data.role && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != 'owner' && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != 'admin'  ) ; // User can update their own, but not change their role unless they are owner/admin
+      allow update: if request.auth.uid == userId && !('role' in request.resource.data);
       allow delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner' && request.auth.uid != userId;
     }
 
-    // Categories Collection
+    // Categories collection:
     // - All authenticated users can read categories.
-    // - Owner, Admin, Employee can create, update, delete categories.
+    // - Owner, Admin, and Employee can create, update, delete categories.
     match /categories/{categoryId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
     }
 
-    // Products Collection
+    // Products collection:
     // - All authenticated users can read products.
-    // - Owner, Admin, Employee can create, update, delete products.
+    // - Owner, Admin, and Employee can create, update, delete products.
     match /products/{productId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
     }
 
-    // Customers Collection
+    // Customers collection:
     // - All authenticated users can read customers.
-    // - Owner, Admin, Employee can create, update, delete customers.
+    // - Owner, Admin, and Employee can create, update, delete customers.
     match /customers/{customerId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
     }
 
-    // Orders Collection
-    // - All authenticated users can read orders (for history).
-    // - Owner, Admin, Employee can create orders.
-    // - Only Owner can update orders.
-    // - Deletion of orders is typically disallowed or restricted to Owners for specific cleanup.
+    // Orders collection:
+    // - Authenticated users (owner, admin, employee) can read orders.
+    // - Owner, Admin, and Employee can create orders.
+    // - Only 'owner' can update orders.
+    // - Deletion of orders is disallowed to maintain history.
     match /orders/{orderId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
       allow create: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
       allow update: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
-      allow delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner'; // Or 'false' if deletion is not allowed
+      allow delete: if false; // Generally, orders should not be deleted.
     }
+
+    // Fallback for any other paths - generally deny unless explicitly allowed above.
+    // This is a good security practice. If a path is not matched by specific rules,
+    // it will be denied by default if there's no broader rule allowing it.
+    // However, for development or if you have other collections, you might need to adjust.
+    // The rules above are specific to known collections.
+    // If you have other collections, add rules for them.
+    // For example, if there's a 'storeSettings' collection:
+    // match /storeSettings/{settingId} {
+    //   allow read: if request.auth != null; // Example: allow authenticated reads
+    //   allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner'; // Example: only owner writes
+    // }
   }
 }
