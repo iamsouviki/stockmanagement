@@ -1,3 +1,4 @@
+
 // src/components/settings/user-management/UserManagementForm.tsx
 "use client";
 
@@ -41,15 +42,17 @@ const newUserSchema = userManagementSchemaBase.extend({
 });
 
 const editUserSchema = userManagementSchemaBase.extend({
+  // For editing, email and password are not directly changed in this form,
+  // but Zod needs them defined if they are part of the UserManagementFormData type.
+  // They are disabled in the form. Password changes would require a separate mechanism.
   email: z.string().email("Invalid email address.").optional(), 
   password: z.string().optional(), 
 });
 
 
-// Updated UserManagementFormData to be more general
 export type UserManagementFormData = z.infer<typeof userManagementSchemaBase> & {
-  email?: string | undefined;
-  password?: string | undefined;
+  email?: string; // Made email optional at the base type for broader compatibility
+  password?: string; // Password is only for new users
 };
 
 interface UserManagementFormProps {
@@ -89,10 +92,10 @@ const UserManagementForm: React.FC<UserManagementFormProps> = ({ userToEdit, onS
         displayName: userToEdit.displayName || "",
         mobileNumber: userToEdit.mobileNumber || "",
         role: userToEdit.role,
-        password: "",
+        password: "", // Don't prefill password for edit
       });
     } else {
-       form.reset({
+       form.reset({ // Default for new user
         email: "",
         displayName: "",
         mobileNumber: "",
@@ -105,41 +108,52 @@ const UserManagementForm: React.FC<UserManagementFormProps> = ({ userToEdit, onS
   }, [userToEdit, form.reset]);
 
 
+  // Determine available role options based on current user's role and if editing/adding
   let roleOptions: { value: UserRole; label: string }[] = [];
 
   if (userToEdit) { 
+    // When editing an existing user
     roleOptions.push({ value: userToEdit.role, label: userToEdit.role.charAt(0).toUpperCase() + userToEdit.role.slice(1) });
 
     if (!isEditingSelf && userToEdit.role !== 'owner') { 
       if (currentUserRole === 'owner') {
+        // Owner can change Admin to Employee, or Employee to Admin
         if (userToEdit.role === 'admin' && !roleOptions.find(r => r.value === 'employee')) {
           roleOptions.push({ value: 'employee', label: 'Employee' });
         } else if (userToEdit.role === 'employee' && !roleOptions.find(r => r.value === 'admin')) {
           roleOptions.push({ value: 'admin', label: 'Admin' });
         }
       } else if (currentUserRole === 'admin') {
+        // Admin can only demote another Admin to Employee
         if (userToEdit.role === 'admin' && !roleOptions.find(r => r.value === 'employee')) {
           roleOptions.push({ value: 'employee', label: 'Employee' });
         }
+        // Admin cannot promote an Employee to Admin, so only 'Employee' option remains if editing an employee.
       }
     }
   } else { 
+    // When adding a new user
     if (currentUserRole === 'owner') {
       roleOptions = [
         { value: 'employee', label: 'Employee' },
         { value: 'admin', label: 'Admin' },
       ];
+      // Ensure default role is one of the available options if it's not already.
       if (form.getValues('role') !== 'admin' && form.getValues('role') !== 'employee') {
          form.setValue('role', 'employee'); 
       }
     } else if (currentUserRole === 'admin') {
       roleOptions = [{ value: 'employee', label: 'Employee' }];
-      form.setValue('role', 'employee'); 
+      form.setValue('role', 'employee'); // Admins can only add Employees
     }
   }
   
+  // Ensure unique roles and sort them for display
   roleOptions = Array.from(new Set(roleOptions.map(r => r.value)))
-    .map(value => roleOptions.find(r => r.value === value)!)
+    .map(value => {
+        const foundOption = roleOptions.find(r => r.value === value);
+        return foundOption || { value, label: value.charAt(0).toUpperCase() + value.slice(1) }; // Fallback label
+    })
     .sort((a, b) => {
       const order: Record<UserRole, number> = { owner: 0, admin: 1, employee: 2 };
       return order[a.value] - order[b.value];
@@ -147,19 +161,28 @@ const UserManagementForm: React.FC<UserManagementFormProps> = ({ userToEdit, onS
 
 
   const getRoleSelectDisabledState = () => {
-    if (isEditingSelf) return true;
-    if (userToEdit?.role === 'owner') return true; 
-
-    if (currentUserRole === 'owner') {
-      return !(userToEdit?.role === 'admin' || userToEdit?.role === 'employee');
-    }
-    if (currentUserRole === 'admin') {
-      if (userToEdit?.role === 'owner') return true;
-      return userToEdit?.role === 'employee'; 
-    }
-    if (!userToEdit && (currentUserRole === 'owner' || currentUserRole === 'admin')) return false; 
+    if (isEditingSelf) return true; // User cannot change their own role.
     
-    return true; 
+    if (userToEdit) {
+      if (userToEdit.role === 'owner') return true; // Owner roles are not changed here.
+      if (currentUserRole === 'owner') {
+        // Owner can change Admin to Employee or Employee to Admin.
+        // 'roleOptions' will have ['Admin', 'Employee'], so select should be enabled.
+        return roleOptions.length <= 1; // Should be false if both Admin/Employee are options
+      }
+      if (currentUserRole === 'admin') {
+        // Admin can demote another Admin to Employee.
+        // Admin cannot promote an Employee to Admin.
+        // 'roleOptions' for Admin editing Admin: ['Admin', 'Employee'] -> enabled
+        // 'roleOptions' for Admin editing Employee: ['Employee'] -> disabled
+        return roleOptions.length <= 1;
+      }
+    } else { // Adding new user
+      if (currentUserRole === 'owner') return false; // Owner can select Admin or Employee.
+      if (currentUserRole === 'admin') return true;  // Admin can only add Employee (role is pre-set).
+    }
+    
+    return true; // Default to disabled if no other condition applies.
   };
   
   const getSubmitButtonText = () => {
@@ -233,7 +256,7 @@ const UserManagementForm: React.FC<UserManagementFormProps> = ({ userToEdit, onS
               <FormLabel>Role</FormLabel>
               <Select 
                 onValueChange={field.onChange} 
-                value={field.value}
+                value={field.value} // Ensure field.value is always one of the UserRole types
                 disabled={getRoleSelectDisabledState()}
               >
                 <FormControl>
@@ -275,3 +298,4 @@ const UserManagementForm: React.FC<UserManagementFormProps> = ({ userToEdit, onS
 };
 
 export default UserManagementForm;
+
