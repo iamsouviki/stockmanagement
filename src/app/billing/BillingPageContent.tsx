@@ -104,17 +104,17 @@ export default function BillingPageContent() {
             const itemsForBill: BillItem[] = order.items.map(item => {
               const productDetails = availableProducts.find(p => p.id === item.productId);
               return {
-                ...item,
-                id: item.productId, // Ensure BillItem's own id is set (from product.id)
+                ...item, // Spread OrderItemData properties
+                id: item.productId, // Override id to be productId for BillItem consistency
                 name: productDetails?.name || item.name,
                 price: productDetails?.price || item.price,
                 quantity: productDetails?.quantity ?? 0, // Stock quantity from Product
                 billQuantity: item.billQuantity, // Quantity being billed
                 categoryId: productDetails?.categoryId ?? '',
                 serialNumber: item.serialNumber || productDetails?.serialNumber || '',
-                barcode: item.barcode || productDetails?.barcode || '',
-                imageUrl: item.imageUrl === null ? undefined : (productDetails?.imageUrl || item.imageUrl), // Handle null for imageUrl
-                imageHint: item.imageHint === null ? undefined : (productDetails?.imageHint || item.imageHint), // Handle null for imageHint
+                barcode: item.barcode || productDetails?.barcode || '', // Ensure barcode is string
+                imageUrl: productDetails?.imageUrl ?? (item.imageUrl === null ? undefined : item.imageUrl),
+                imageHint: productDetails?.imageHint ?? (item.imageHint === null ? undefined : item.imageHint),
               };
             });
             setBillItems(itemsForBill);
