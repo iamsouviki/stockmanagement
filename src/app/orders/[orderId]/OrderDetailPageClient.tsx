@@ -9,11 +9,11 @@ import { getOrder, updateOrderAndAdjustStock, getProducts } from '@/services/fir
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Copy, Printer, Package, Edit, Save, XCircle, Trash2, PlusCircle, MinusCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Copy, Printer, Package, Edit, Save, XCircle, Trash2, Loader2, PlusCircle, ScanLine } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
-import { Timestamp } from 'firebase/firestore';
+import type { Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
 import { storeDetails } from '@/config/storeDetails';
@@ -39,10 +39,11 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [editableItems, setEditableItems] = useState<OrderItemData[]>([]);
+  const [editableItems, setEditableItems] = useState<BillItem[]>([]);
   const [isUpdatingOrder, setIsUpdatingOrder] = useState(false);
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [newProductInput, setNewProductInput] = useState('');
 
 
   const fetchOrderData = useCallback(async () => {
@@ -52,7 +53,26 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
         const fetchedOrder = await getOrder(orderId);
         if (fetchedOrder) {
           setOrder(fetchedOrder);
-          setEditableItems(JSON.parse(JSON.stringify(fetchedOrder.items))); // Deep copy for editing
+          // Ensure editableItems are structured as BillItem[]
+          const billItemsFromOrder: BillItem[] = fetchedOrder.items.map(item => {
+            const productDetails = availableProducts.find(p => p.id === item.productId);
+            return {
+              id: item.productId,
+              name: productDetails?.name || item.name,
+              serialNumber: item.serialNumber || productDetails?.serialNumber || '',
+              barcode: item.barcode || productDetails?.barcode || '',
+              price: productDetails?.price || item.price,
+              quantity: productDetails?.quantity || 0, // DB stock
+              categoryId: productDetails?.categoryId || '',
+              categoryName: productDetails?.categoryName,
+              imageUrl: productDetails?.imageUrl || item.imageUrl || undefined,
+              imageHint: productDetails?.imageHint || item.imageHint || undefined,
+              createdAt: productDetails?.createdAt,
+              updatedAt: productDetails?.updatedAt,
+              billQuantity: item.billQuantity, // Quantity in this bill
+            };
+          });
+          setEditableItems(billItemsFromOrder);
         } else {
           toast({ title: "Error", description: "Order not found.", variant: "destructive" });
           router.push('/orders');
@@ -63,7 +83,7 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
       }
       setIsLoading(false);
     }
-  }, [orderId, toast, router]);
+  }, [orderId, toast, router, availableProducts]); // Added availableProducts
 
   const fetchProductsData = useCallback(async () => {
     setIsLoadingProducts(true);
@@ -78,9 +98,17 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
   }, [toast]);
 
   useEffect(() => {
-    fetchOrderData();
     fetchProductsData();
-  }, [fetchOrderData, fetchProductsData]);
+  }, [fetchProductsData]);
+
+  useEffect(() => {
+    // Fetch order data only after products are loaded if we need product details for mapping
+    if (availableProducts.length > 0) {
+        fetchOrderData();
+    } else if (!isLoadingProducts) { // If products finished loading and there are none (edge case)
+        fetchOrderData(); // Still try to fetch order, might display basic item info
+    }
+  }, [fetchOrderData, availableProducts, isLoadingProducts]);
 
 
   const formatDate = (dateValue: Timestamp | string | Date | undefined | null) => {
@@ -98,58 +126,73 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
     toast({ title: "PDF Ready", description: "Bill opening for printing." });
   };
 
-  const handleRecreateBill = () => {
+  const handleRecreateBillFromOrder = () => {
     if (order) router.push(`/billing?fromOrder=${order.id}`);
   };
   
   const handleToggleEdit = () => {
-    if (isEditing) { // Cancel edit
-      setEditableItems(JSON.parse(JSON.stringify(order?.items || []))); // Reset to original
+    if (isEditing && order) { // Cancel edit
+      const billItemsFromOrder: BillItem[] = order.items.map(item => {
+            const productDetails = availableProducts.find(p => p.id === item.productId);
+            return {
+              id: item.productId,
+              name: productDetails?.name || item.name,
+              serialNumber: item.serialNumber || productDetails?.serialNumber || '',
+              barcode: item.barcode || productDetails?.barcode || '',
+              price: productDetails?.price || item.price,
+              quantity: productDetails?.quantity || 0,
+              categoryId: productDetails?.categoryId || '',
+              categoryName: productDetails?.categoryName,
+              imageUrl: productDetails?.imageUrl || item.imageUrl || undefined,
+              imageHint: productDetails?.imageHint || item.imageHint || undefined,
+              createdAt: productDetails?.createdAt,
+              updatedAt: productDetails?.updatedAt,
+              billQuantity: item.billQuantity,
+            };
+          });
+      setEditableItems(billItemsFromOrder);
     }
     setIsEditing(!isEditing);
+    setNewProductInput(''); // Clear new product input when toggling edit mode
   };
 
   const handleItemQuantityChange = (productId: string, newQuantityStr: string) => {
     const newQuantity = parseInt(newQuantityStr, 10);
-    if (isNaN(newQuantity) || newQuantity < 0) {
-      // Keep existing valid quantity or set to 1 if invalid input.
-      // Or, allow user to clear it and handle validation on save. For now, let's clamp.
-      // For now, if input is invalid, do nothing or reset to current item quantity
-      return; 
-    }
+    if (isNaN(newQuantity) || newQuantity < 0) return;
     
+    const itemToUpdate = editableItems.find(item => item.id === productId);
     const originalItemInOrder = order?.items.find(item => item.productId === productId);
     const productInDb = availableProducts.find(p => p.id === productId);
 
-    if (!productInDb || !originalItemInOrder) {
+    if (!productInDb || !itemToUpdate) {
       toast({ title: "Error", description: "Product details not found.", variant: "destructive" });
       return;
     }
 
     const currentDbStock = productInDb.quantity;
-    const originalBilledQuantity = originalItemInOrder.billQuantity;
-    const maxAllowedQuantity = currentDbStock + originalBilledQuantity;
+    // If item was in original order, its original quantity is "available" from the order itself for this edit.
+    const originalBilledQuantity = originalItemInOrder ? originalItemInOrder.billQuantity : 0;
+    // Max quantity for an item that *was* in the original order
+    const maxAllowedForExistingItem = currentDbStock + originalBilledQuantity;
 
-    if (newQuantity === 0) { // Allow setting to 0 to indicate removal intent, will be filtered on save
+    if (newQuantity === 0) { 
        setEditableItems(prevItems =>
         prevItems.map(item =>
-          item.productId === productId ? { ...item, billQuantity: 0 } : item
+          item.id === productId ? { ...item, billQuantity: 0 } : item
         )
-      );
+      ); // Will be filtered on save
       return;
     }
 
-
-    if (newQuantity > maxAllowedQuantity) {
+    if (newQuantity > maxAllowedForExistingItem) {
       toast({
         title: "Stock Limit Exceeded",
-        description: `Cannot set quantity for "${productInDb.name}" to ${newQuantity}. Max available considering original sale: ${maxAllowedQuantity}.`,
+        description: `Cannot set quantity for "${productInDb.name}" to ${newQuantity}. Max available (DB stock + original order qty): ${maxAllowedForExistingItem}.`,
         variant: "destructive",
       });
-      // Optionally set to maxAllowedQuantity or leave as is
       setEditableItems(prevItems =>
         prevItems.map(item =>
-          item.productId === productId ? { ...item, billQuantity: maxAllowedQuantity } : item
+          item.id === productId ? { ...item, billQuantity: maxAllowedForExistingItem } : item
         )
       );
       return;
@@ -157,49 +200,128 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
 
     setEditableItems(prevItems =>
       prevItems.map(item =>
-        item.productId === productId ? { ...item, billQuantity: newQuantity } : item
+        item.id === productId ? { ...item, billQuantity: newQuantity } : item
       )
     );
   };
 
   const handleRemoveEditableItem = (productId: string) => {
-    setEditableItems(prevItems => prevItems.filter(item => item.productId !== productId));
+    // Instead of filtering, set billQuantity to 0 to indicate removal.
+    // This helps in correctly calculating stock adjustments later.
+    setEditableItems(prevItems => 
+      prevItems.map(item => item.id === productId ? { ...item, billQuantity: 0 } : item)
+    );
+    toast({title: "Item Marked for Removal", description: "Item will be removed when changes are saved."});
   };
 
+  const handleAddNewProductSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newProductInput.trim()) {
+      handleAddNewProductToOrder(newProductInput.trim());
+    }
+  };
+
+  const handleAddNewProductToOrder = (barcodeOrSn: string) => {
+    if (!isEditing) return;
+
+    const productToAdd = availableProducts.find(
+      (p) => p.barcode === barcodeOrSn || p.serialNumber === barcodeOrSn
+    );
+
+    if (!productToAdd) {
+      toast({ title: "Product Not Found", description: `No product with barcode/SN: ${barcodeOrSn}`, variant: "destructive" });
+      return;
+    }
+
+    if (productToAdd.quantity <= 0) {
+      toast({ title: "Out of Stock", description: `Product "${productToAdd.name}" is out of stock.`, variant: "destructive" });
+      return;
+    }
+
+    setEditableItems(prevItems => {
+      const existingItem = prevItems.find(item => item.id === productToAdd.id);
+      if (existingItem) {
+        // If item already in list (e.g. was part of original order, or added in this edit session)
+        let stockAvailableForThisItem = productToAdd.quantity; // Base DB stock
+        const originalItem = order?.items.find(oi => oi.productId === productToAdd.id);
+        if (originalItem) {
+          stockAvailableForThisItem += originalItem.billQuantity; // Add stock "reserved" by original order
+        }
+
+        if (existingItem.billQuantity < stockAvailableForThisItem) {
+          toast({ title: "Product Quantity Increased", description: `Quantity for "${productToAdd.name}" increased.` });
+          return prevItems.map(item =>
+            item.id === productToAdd.id ? { ...item, billQuantity: item.billQuantity + 1 } : item
+          );
+        } else {
+          toast({ title: "Max Stock Reached", description: `Cannot add more of "${productToAdd.name}". Available (DB + original order): ${stockAvailableForThisItem}.`, variant: "destructive" });
+          return prevItems;
+        }
+      } else {
+        // Adding a completely new product to this order
+        if (productToAdd.quantity > 0) { // Check current DB stock
+          toast({ title: "Product Added", description: `"${productToAdd.name}" added to order.` });
+          const newItem: BillItem = {
+            ...productToAdd, // Spreads all Product fields
+            billQuantity: 1,
+          };
+          return [...prevItems, newItem];
+        } else { // Should have been caught above, but as a safeguard
+          toast({ title: "Out of Stock", description: `Product "${productToAdd.name}" is out of stock.`, variant: "destructive" });
+          return prevItems;
+        }
+      }
+    });
+    setNewProductInput(''); // Clear input after adding
+  };
+
+
   const { subtotal, taxAmount, totalAmount } = useMemo(() => {
-    const itemsToCalculate = isEditing ? editableItems.filter(item => item.billQuantity > 0) : order?.items || [];
+    // Calculate totals based on items that will remain (billQuantity > 0)
+    const itemsToCalculate = editableItems.filter(item => item.billQuantity > 0);
     const currentSubtotal = itemsToCalculate.reduce((sum, item) => sum + item.price * item.billQuantity, 0);
-    const currentTaxAmount = currentSubtotal * 0.18; // Assuming 18% tax
+    const currentTaxAmount = currentSubtotal * 0.18; 
     const currentTotalAmount = currentSubtotal + currentTaxAmount;
     return { subtotal: currentSubtotal, taxAmount: currentTaxAmount, totalAmount: currentTotalAmount };
-  }, [isEditing, editableItems, order?.items]);
+  }, [editableItems]);
 
 
   const handleSaveChanges = async () => {
     if (!order) return;
     setIsUpdatingOrder(true);
 
-    const finalEditableItems = editableItems.filter(item => item.billQuantity > 0);
+    // Filter out items marked for removal (billQuantity set to 0)
+    const finalEditableItemsData: OrderItemData[] = editableItems
+      .filter(item => item.billQuantity > 0)
+      .map(item => ({
+        productId: item.id,
+        name: item.name,
+        price: item.price,
+        billQuantity: item.billQuantity,
+        imageUrl: item.imageUrl === undefined ? null : item.imageUrl,
+        imageHint: item.imageHint === undefined ? null : item.imageHint,
+        serialNumber: item.serialNumber || null,
+        barcode: item.barcode || null,
+      }));
 
-    if (finalEditableItems.length === 0 && order.items.length > 0) {
-        toast({ title: "Empty Order", description: "Cannot save an order with no items. If you intend to cancel the order, please use a separate cancellation process (not yet implemented).", variant: "destructive", duration: 7000 });
+    if (finalEditableItemsData.length === 0 && order.items.length > 0) {
+        toast({ title: "Empty Order", description: "Cannot save an order with no items. If you wish to cancel, please use a dedicated cancellation feature (not yet implemented).", variant: "destructive", duration: 7000 });
         setIsUpdatingOrder(false);
         return;
     }
-     if (finalEditableItems.length === 0 && order.items.length === 0) { // Original order was also empty
+     if (finalEditableItemsData.length === 0 && order.items.length === 0) { 
         toast({ title: "No Changes", description: "Order is already empty.", variant: "default"});
         setIsEditing(false);
         setIsUpdatingOrder(false);
         return;
     }
 
-
     const updatedOrderPayload: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'> = {
-      customerId: order.customerId,
+      customerId: order.customerId, // Customer details are not editable in this flow
       customerName: order.customerName,
       customerMobile: order.customerMobile,
       customerAddress: order.customerAddress,
-      items: finalEditableItems,
+      items: finalEditableItemsData,
       subtotal: subtotal,
       taxAmount: taxAmount,
       totalAmount: totalAmount,
@@ -209,7 +331,8 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
       await updateOrderAndAdjustStock(order.id, updatedOrderPayload, order);
       toast({ title: "Order Updated", description: "Order details saved successfully.", className: "bg-green-500 text-white" });
       setIsEditing(false);
-      fetchOrderData(); // Refetch to show updated data
+      fetchOrderData(); 
+      fetchProductsData(); // Re-fetch products as stock might have changed
     } catch (error: any) {
       console.error("Error updating order:", error);
       toast({ title: "Update Failed", description: error.message || "Could not update order.", variant: "destructive" });
@@ -257,7 +380,7 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
                 <Edit className="h-5 w-5 !text-accent" />
                 <AlertTitle className="font-semibold">Order Edit Mode</AlertTitle>
                 <AlertDescription>
-                You are currently editing order {order.orderNumber}. Modify item quantities or remove items. Click "Save Changes" to update or "Cancel" to discard.
+                You are currently editing order {order.orderNumber}. Modify item quantities, remove items, or add new products. Click "Save Changes" to update or "Cancel" to discard.
                 </AlertDescription>
             </Alert>
         )}
@@ -290,8 +413,25 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(isEditing ? editableItems : order.items).map((item, index) => (
-                      <TableRow key={item.productId + index}>
+                    {(isEditing ? editableItems : order.items.map(item => { // Map original order items to BillItem for display if not editing
+                        const productDetails = availableProducts.find(p => p.id === item.productId);
+                        return {
+                            id: item.productId,
+                            name: productDetails?.name || item.name,
+                            serialNumber: item.serialNumber || productDetails?.serialNumber || '',
+                            barcode: item.barcode || productDetails?.barcode || '',
+                            price: productDetails?.price || item.price,
+                            quantity: productDetails?.quantity || 0,
+                            categoryId: productDetails?.categoryId || '',
+                            categoryName: productDetails?.categoryName,
+                            imageUrl: productDetails?.imageUrl || item.imageUrl || undefined,
+                            imageHint: productDetails?.imageHint || item.imageHint || undefined,
+                            createdAt: productDetails?.createdAt,
+                            updatedAt: productDetails?.updatedAt,
+                            billQuantity: item.billQuantity,
+                        };
+                    })).filter(item => !isEditing || item.billQuantity > 0).map((item, index) => ( // Filter out "removed" items only in edit mode display before mapping
+                      <TableRow key={item.id + '-' + index} className={isEditing && item.billQuantity === 0 ? 'opacity-50' : ''}>
                         <TableCell className="px-2 sm:px-4">
                           {item.imageUrl ? (
                             <Image src={item.imageUrl} alt={item.name} width={32} height={32} className="rounded-md object-cover sm:w-10 sm:h-10" data-ai-hint={item.imageHint || "product item"}/>
@@ -310,7 +450,7 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
                                 <Input
                                 type="number"
                                 value={item.billQuantity}
-                                onChange={(e) => handleItemQuantityChange(item.productId, e.target.value)}
+                                onChange={(e) => handleItemQuantityChange(item.id, e.target.value)}
                                 className="w-16 h-8 text-center text-xs"
                                 min="0"
                                 />
@@ -322,17 +462,17 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
                         <TableCell className="text-right text-xs sm:text-sm px-2 sm:px-4">\u20B9{(item.price * item.billQuantity).toFixed(2)}</TableCell>
                         {isEditing && (
                           <TableCell className="text-center px-2 sm:px-4">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRemoveEditableItem(item.productId)} title="Remove Item">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRemoveEditableItem(item.id)} title="Mark for Removal" disabled={item.billQuantity === 0}>
                               <Trash2 className="h-4 w-4 text-red-600" />
                             </Button>
                           </TableCell>
                         )}
                       </TableRow>
                     ))}
-                     {(isEditing && editableItems.length === 0) && (
+                     {(isEditing && editableItems.filter(item => item.billQuantity > 0).length === 0) && (
                         <TableRow>
-                            <TableCell colSpan={isEditing ? 7: 6} className="text-center h-24 text-muted-foreground">
-                                No items in the order. Add items if this is an error or save changes if intended.
+                            <TableCell colSpan={isEditing ? 7 : 6} className="text-center h-24 text-muted-foreground">
+                                No items in the order. Add new products or cancel editing.
                             </TableCell>
                         </TableRow>
                     )}
@@ -340,6 +480,25 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
                 </Table>
                 <ScrollBar orientation="horizontal" />
               </ScrollArea>
+
+              {isEditing && (
+                <div className="mt-4 pt-4 border-t">
+                  <h4 className="font-semibold text-md mb-2">Add New Product</h4>
+                  <form onSubmit={handleAddNewProductSubmit} className="flex flex-col sm:flex-row gap-2">
+                    <Input
+                      type="text"
+                      value={newProductInput}
+                      onChange={(e) => setNewProductInput(e.target.value)}
+                      placeholder="Enter Barcode or Serial Number"
+                      className="flex-grow text-sm"
+                      aria-label="Add new product by barcode or serial number"
+                    />
+                    <Button type="submit" className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto">
+                      <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                    </Button>
+                  </form>
+                </div>
+              )}
             </div>
             <div className="text-right space-y-1 pr-2 sm:pr-4">
               <p>Subtotal: <span className="font-semibold">\u20B9{subtotal.toFixed(2)}</span></p>
@@ -353,7 +512,7 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
                 <Button variant="outline" onClick={handleToggleEdit} disabled={isUpdatingOrder} className="w-full sm:w-auto">
                   <XCircle className="mr-2 h-4 w-4" /> Cancel
                 </Button>
-                <Button onClick={handleSaveChanges} disabled={isUpdatingOrder || isLoadingProducts} className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white">
+                <Button onClick={handleSaveChanges} disabled={isUpdatingOrder || isLoadingProducts || editableItems.filter(it => it.billQuantity > 0).length === 0} className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white">
                   {isUpdatingOrder ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                   Save Changes
                 </Button>
@@ -364,7 +523,7 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
                   <Printer className="mr-2 h-4 w-4" /> Print Bill
                 </Button>
                 {userProfile && allowedRecreateRoles.includes(userProfile.role) && (
-                  <Button onClick={handleRecreateBill} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
+                  <Button onClick={handleRecreateBillFromOrder} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
                     <Copy className="mr-2 h-4 w-4" /> Re-create Bill
                   </Button>
                 )}
