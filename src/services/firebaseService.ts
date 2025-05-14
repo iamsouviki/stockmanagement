@@ -159,7 +159,7 @@ export const findProductBySerialNumberOrBarcode = async (serialNumber?: string, 
     const snapshot = await getDocs(q);
     if (!snapshot.empty) {
       const docData = snapshot.docs[0];
-      return { id: docData.id, ...docData.data() } as Product;
+      return { id: docData.id, ...docData.data() } as unknown as Product;
     }
   }
 
@@ -168,7 +168,7 @@ export const findProductBySerialNumberOrBarcode = async (serialNumber?: string, 
     const snapshot = await getDocs(q);
     if (!snapshot.empty) {
       const docData = snapshot.docs[0];
-      return { id: docData.id, ...docData.data() } as Product;
+      return { id: docData.id, ...docData.data() } as unknown as Product;
     }
   }
   return null;
@@ -207,7 +207,7 @@ export const addOrderAndDecrementStock = async (
   const orderNumber = `ORD-${format(now, 'yyyyMMdd-HHmmssSSS')}`;
   
   const completeOrderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> & { 
-    orderDate: Timestamp; // Explicitly Timestamp
+    orderDate: Timestamp; 
     createdAt: FieldValue; 
     updatedAt: FieldValue; 
   } = { 
@@ -300,14 +300,15 @@ export const updateOrderAndAdjustStock = async (
     throw error; 
   }
 
-  const finalOrderUpdateData: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'> & { updatedAt: FieldValue } = {
+  const finalOrderUpdateData: Partial<Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt'>> & { updatedAt: FieldValue } = {
     ...updatedOrderPayload,
     updatedAt: serverTimestamp(),
   };
   
-  batch.update(orderRef, finalOrderUpdateData); 
+  batch.update(orderRef, finalOrderUpdateData as any); // Using 'as any' to bypass strict type check for partial update with serverTimestamp
 
   await batch.commit();
   console.log("--- updateOrderAndAdjustStock END --- Order update batch committed successfully.");
   return orderId;
 };
+

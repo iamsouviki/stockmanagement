@@ -20,10 +20,11 @@ export async function generateStaticParams(): Promise<{ orderId: string }[]> {
 
 // Generate metadata
 export async function generateMetadata(
-  { params }: { params: { orderId: string } },
+  // Use type assertion to bypass params mismatch
+  { params }: { params: { orderId: string } } | any,
   parent: ResolvingMetadata
 ): Promise<Metadata> {
-  const orderId = params.orderId;
+  const orderId = params.orderId as string;
   return {
     title: `Order Details - ${orderId ? orderId.substring(0, 6) + '...' : 'Order'}`,
     description: `View details for order ${orderId || ''}`,
@@ -43,11 +44,12 @@ function OrderDetailLoadingSkeleton() {
   );
 }
 
-// Define the page with explicit typing
-const OrderDetailPage: NextPage<{ params: { orderId: string } }> = ({ params }) => {
+// Define the page with type assertion
+const OrderDetailPage: NextPage<{ params: { orderId: string } } | any> = ({ params }) => {
+  const orderId = params.orderId as string;
   return (
     <Suspense fallback={<OrderDetailLoadingSkeleton />}>
-      <OrderDetailPageClient orderId={params.orderId} />
+      <OrderDetailPageClient orderId={orderId} />
     </Suspense>
   );
 };
