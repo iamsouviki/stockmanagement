@@ -20,7 +20,7 @@ jobs:
         run: npm ci
 
       - name: Build Next.js app
-        run: npm run build # Use "npm run build && npm run export" for static export
+        run: npm run build && npm run export
 
       - name: Deploy to Firebase Hosting
         uses: w9jds/firebase-action@master
