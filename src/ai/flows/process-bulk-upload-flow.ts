@@ -1,6 +1,6 @@
 
 // src/ai/flows/process-bulk-upload-flow.ts
-'use server';
+
 /**
  * @fileOverview Handles bulk product uploads.
  *
