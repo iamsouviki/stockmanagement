@@ -22,7 +22,7 @@ import {
   type QueryDocumentSnapshot,
   endBefore,
   limitToLast,
-  type FieldValue, // Added FieldValue
+  type FieldValue,
 } from 'firebase/firestore';
 import type { Product, Customer, Category, Order, OrderItemData } from '@/types';
 import { WALK_IN_CUSTOMER_ID } from '@/types'; 
@@ -84,7 +84,7 @@ const updateDocument = async <T extends object>(collectionName: string, id: stri
   const docRef = doc(db, collectionName, id);
   await updateDoc(docRef, {
     ...data,
-    updatedAt: serverTimestamp(), // This is fine here as updateDoc expects UpdateData<T>
+    updatedAt: serverTimestamp(),
   });
 };
 
@@ -93,7 +93,6 @@ const deleteDocument = async (collectionName: string, id: string): Promise<void>
 };
 
 // Categories Service
-// For now, categories are not paginated. If needed, create getCategoriesPaginated
 export const getCategories = async (): Promise<Category[]> => {
   const { data } = await getCollection<Category>('categories', 'name');
   return data;
@@ -122,7 +121,7 @@ export const findCategoryByNameOrCreate = async (name: string): Promise<Category
 
 
 // Products Service
-export const getProducts = async (): Promise<Product[]> => { // Non-paginated version
+export const getProducts = async (): Promise<Product[]> => { 
   const { data } = await getCollection<Product>('products', 'name');
   return data;
 }
@@ -177,7 +176,6 @@ export const findProductBySerialNumberOrBarcode = async (serialNumber?: string, 
 
 
 // Customers Service
-// For now, customers are not paginated. If needed, create getCustomersPaginated
 export const getCustomers = async (): Promise<Customer[]> => {
   const { data } = await getCollection<Customer>('customers', 'name');
   return data;
@@ -194,7 +192,6 @@ export const findCustomerByMobile = async (mobileNumber: string): Promise<Custom
 
 
 // Orders Service
-// For now, orders are not paginated. If needed, create getOrdersPaginated
 export const getOrders = async (): Promise<Order[]> => {
     const { data } = await getCollection<Order>('orders', 'orderDate', 'desc');
     return data;
@@ -209,7 +206,11 @@ export const addOrderAndDecrementStock = async (
   const now = new Date();
   const orderNumber = `ORD-${format(now, 'yyyyMMdd-HHmmssSSS')}`;
   
-  const completeOrderData: Omit<Order, 'id'> & { createdAt: FieldValue, updatedAt: FieldValue } = { 
+  const completeOrderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> & { 
+    orderDate: Timestamp; // Explicitly Timestamp
+    createdAt: FieldValue; 
+    updatedAt: FieldValue; 
+  } = { 
     ...orderData, 
     orderNumber,
     orderDate: Timestamp.fromDate(now),
@@ -288,7 +289,7 @@ export const updateOrderAndAdjustStock = async (
       }
     } catch (error) {
       console.error(`Error preparing stock update for product ${productId}:`, error);
-      throw error;
+      throw error; 
     }
   });
 
@@ -299,20 +300,14 @@ export const updateOrderAndAdjustStock = async (
     throw error; 
   }
 
-  const finalOrderUpdateData: Partial<Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'>> & { updatedAt: FieldValue } = {
+  const finalOrderUpdateData: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'> & { updatedAt: FieldValue } = {
     ...updatedOrderPayload,
     updatedAt: serverTimestamp(),
   };
   
-  // id, orderNumber, orderDate, createdAt should not be part of the update payload for an existing document in this manner
-  // They are either fixed or handled differently (like updatedAt which is now explicitly a FieldValue)
-  // The existing properties from updatedOrderPayload are already spread.
-
-  batch.update(orderRef, finalOrderUpdateData as any); // Cast to any to satisfy batch.update with FieldValue
+  batch.update(orderRef, finalOrderUpdateData); 
 
   await batch.commit();
   console.log("--- updateOrderAndAdjustStock END --- Order update batch committed successfully.");
   return orderId;
 };
-
-
