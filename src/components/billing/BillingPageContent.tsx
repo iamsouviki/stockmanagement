@@ -25,8 +25,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import BillingPageLoadingSkeleton from './BillingPageLoadingSkeleton';
 import { generateInvoicePdf } from '@/lib/pdfGenerator'; // Import the new PDF utility
+import { useAuth } from '@/hooks/useAuth';
 
 export default function BillingPageContent() {
+  const { userProfile } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromOrderId = searchParams.get('fromOrder');
@@ -361,7 +363,7 @@ export default function BillingPageContent() {
         throw new Error("Failed to retrieve the newly created order for PDF generation.");
       }
 
-      generateInvoicePdf(newOrder, storeDetails);
+      generateInvoicePdf(newOrder, storeDetails,userProfile?.displayName ?? storeDetails.name);
 
       toast({
         title: "Bill Sent for Printing!",

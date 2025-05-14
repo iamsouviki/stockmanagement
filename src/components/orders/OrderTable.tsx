@@ -120,13 +120,6 @@ const OrderTable: React.FC<OrderTableProps> = ({ orders, filtersActive }) => {
                           </Link>
                         </Button>
                         )}
-                        {canEditOrder(order) && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8" asChild title="Edit Order">
-                            <Link href={`/billing?fromOrder=${order.id}&intent=edit`}>
-                              <Edit className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500" />
-                            </Link>
-                          </Button>
-                        )}
                     </div>
                     </TableCell>
                 </TableRow>

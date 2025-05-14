@@ -22,10 +22,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import BillingPageLoadingSkeleton from '@/components/billing/BillingPageLoadingSkeleton';
 import { generateInvoicePdf } from '@/lib/pdfGenerator'; 
+import { useAuth } from '@/hooks/useAuth';
 
 export default function BillingPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams(); 
+
+  const { currentUser } = useAuth();
 
   const [paramFromOrder, setParamFromOrder] = useState<string | null>(null);
   const [paramIntent, setParamIntent] = useState<string | null>(null);
@@ -441,7 +444,7 @@ export default function BillingPageContent() {
         throw new Error("Failed to retrieve the order details for PDF generation.");
       }
 
-      generateInvoicePdf(finalOrderForPdf, storeDetails);
+      generateInvoicePdf(finalOrderForPdf, storeDetails,currentUser?.displayName ?? storeDetails.name);
       
       setBillItems([]);
       handleClearCustomer();

@@ -125,7 +125,7 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
   };
 
   const handlePrintOrderPDF = (currentOrder: Order) => {
-    generateInvoicePdf(currentOrder, storeDetails);
+    generateInvoicePdf(currentOrder, storeDetails,userProfile?.displayName ?? storeDetails.name);
     toast({ title: "PDF Ready", description: "Bill opening for printing." });
   };
 
