@@ -20,12 +20,13 @@ export async function generateStaticParams() {
 }
 
 // Optional: If you want dynamic metadata based on the orderId
-type Props = {
-  params: { orderId: string }
-}
+// Removed type alias Props as it was causing a conflict with an internal PageProps constraint.
+// type Props = {
+//   params: { orderId: string }
+// }
 
 export async function generateMetadata(
-  { params }: Props,
+  { params }: { params: { orderId: string } }, // Used inline type
   parent: ResolvingMetadata
 ): Promise<Metadata> {
   const orderId = params.orderId;
@@ -51,7 +52,7 @@ function OrderDetailLoadingSkeleton() {
   }
 
 
-export default function OrderDetailPage({ params }: Props) {
+export default function OrderDetailPage({ params }: { params: { orderId: string } }) { // Used inline type
   return (
     <Suspense fallback={<OrderDetailLoadingSkeleton />}>
       <OrderDetailPageClient orderId={params.orderId} />
