@@ -46,7 +46,11 @@ const editUserSchema = userManagementSchemaBase.extend({
 });
 
 
-export type UserManagementFormData = z.infer<typeof newUserSchema>; 
+// Updated UserManagementFormData to be more general
+export type UserManagementFormData = z.infer<typeof userManagementSchemaBase> & {
+  email?: string | undefined;
+  password?: string | undefined;
+};
 
 interface UserManagementFormProps {
   userToEdit?: UserProfile | null;
@@ -73,7 +77,7 @@ const UserManagementForm: React.FC<UserManagementFormProps> = ({ userToEdit, onS
           email: "",
           displayName: "",
           mobileNumber: "",
-          role: 'employee', // Default for new users, actual options depend on creator's role
+          role: 'employee', 
           password: "",
         },
   });
@@ -92,49 +96,48 @@ const UserManagementForm: React.FC<UserManagementFormProps> = ({ userToEdit, onS
         email: "",
         displayName: "",
         mobileNumber: "",
-        role: 'employee', // Sensible default
+        role: 'employee', 
         password: "",
       });
     }
+  // The form.reset dependency array should ideally include all dependencies that affect the reset logic.
+  // eslint-disable-next-line react-hooks/exhaustive-deps 
   }, [userToEdit, form.reset]);
 
 
   let roleOptions: { value: UserRole; label: string }[] = [];
 
-  if (userToEdit) { // Editing existing user
-    // Always include the current role of the user being edited.
+  if (userToEdit) { 
     roleOptions.push({ value: userToEdit.role, label: userToEdit.role.charAt(0).toUpperCase() + userToEdit.role.slice(1) });
 
-    if (!isEditingSelf && userToEdit.role !== 'owner') { // Cannot change self, cannot change owner role
+    if (!isEditingSelf && userToEdit.role !== 'owner') { 
       if (currentUserRole === 'owner') {
-        // Owner can change Admin to Employee, or Employee to Admin
         if (userToEdit.role === 'admin' && !roleOptions.find(r => r.value === 'employee')) {
           roleOptions.push({ value: 'employee', label: 'Employee' });
         } else if (userToEdit.role === 'employee' && !roleOptions.find(r => r.value === 'admin')) {
           roleOptions.push({ value: 'admin', label: 'Admin' });
         }
       } else if (currentUserRole === 'admin') {
-        // Admin can change another Admin to Employee. Cannot change Employee (stays Employee).
         if (userToEdit.role === 'admin' && !roleOptions.find(r => r.value === 'employee')) {
           roleOptions.push({ value: 'employee', label: 'Employee' });
         }
       }
     }
-  } else { // Adding new user
+  } else { 
     if (currentUserRole === 'owner') {
       roleOptions = [
         { value: 'employee', label: 'Employee' },
         { value: 'admin', label: 'Admin' },
       ];
       if (form.getValues('role') !== 'admin' && form.getValues('role') !== 'employee') {
-         form.setValue('role', 'employee'); // Default for owner creating
+         form.setValue('role', 'employee'); 
       }
     } else if (currentUserRole === 'admin') {
       roleOptions = [{ value: 'employee', label: 'Employee' }];
-      form.setValue('role', 'employee'); // Default/only option for admin creating
+      form.setValue('role', 'employee'); 
     }
   }
-  // Ensure unique roles and sort them
+  
   roleOptions = Array.from(new Set(roleOptions.map(r => r.value)))
     .map(value => roleOptions.find(r => r.value === value)!)
     .sort((a, b) => {
@@ -145,17 +148,16 @@ const UserManagementForm: React.FC<UserManagementFormProps> = ({ userToEdit, onS
 
   const getRoleSelectDisabledState = () => {
     if (isEditingSelf) return true;
-    if (userToEdit?.role === 'owner') return true; // Owner role is immutable via this form
+    if (userToEdit?.role === 'owner') return true; 
 
     if (currentUserRole === 'owner') {
       return !(userToEdit?.role === 'admin' || userToEdit?.role === 'employee');
     }
     if (currentUserRole === 'admin') {
       if (userToEdit?.role === 'owner') return true;
-      // Admin can edit another admin (to demote), or an employee (no role change possible for employee by admin)
       return userToEdit?.role === 'employee'; 
     }
-    if (!userToEdit && (currentUserRole === 'owner' || currentUserRole === 'admin')) return false; // Enable for new user creation
+    if (!userToEdit && (currentUserRole === 'owner' || currentUserRole === 'admin')) return false; 
     
     return true; 
   };
