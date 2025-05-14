@@ -71,8 +71,10 @@ export function generateInvoicePdf(
   const contactLines = doc.splitTextToSize(storeDetails.contact, contentWidth / 2 - 5);
   doc.text(contactLines, pageWidth - margin, yPos, { align: 'right' });
   
-  const addressHeight = (storeAddressLines.length * (doc.getLineHeight('helvetica', 'normal', 8) / doc.internal.scaleFactor));
-  const contactHeight = (contactLines.length * (doc.getLineHeight('helvetica', 'normal', 8) / doc.internal.scaleFactor));
+  // Font size 8 is active here. getLineHeight() will use it.
+  const lineHeightForSize8 = doc.getLineHeight(); // Call without arguments
+  const addressHeight = storeAddressLines.length * lineHeightForSize8;
+  const contactHeight = contactLines.length * lineHeightForSize8;
   yPos += Math.max(addressHeight, contactHeight) + 2;
 
   doc.text(`GSTIN: ${storeDetails.gstNo}`, margin, yPos);
@@ -107,7 +109,8 @@ export function generateInvoicePdf(
     const addressText = `Address: ${order.customerAddress}`;
     const customerAddressLines = doc.splitTextToSize(addressText, contentWidth); 
     doc.text(customerAddressLines, margin, yPos);
-    const customerAddressHeight = (customerAddressLines.length * (doc.getLineHeight('helvetica', 'normal', 8) / doc.internal.scaleFactor));
+    // Font size 8 is active for this calculation
+    const customerAddressHeight = customerAddressLines.length * doc.getLineHeight();
     yPos += customerAddressHeight + 2;
     doc.setFontSize(9); 
   } else {
@@ -117,7 +120,6 @@ export function generateInvoicePdf(
   yPos += 2; 
 
   // --- Column definitions for A4 (in mm) ---
-  // Adjusted column widths to ensure no overflow and provide more space for prices
   const productColWidth = 45; 
   const snBarcodeColWidth = 30;
   const qtyColWidth = 10; 
@@ -125,7 +127,7 @@ export function generateInvoicePdf(
   const itemSubtotalColWidth = 55; 
   const totalExplicitColWidths = productColWidth + snBarcodeColWidth + qtyColWidth + priceColWidth + itemSubtotalColWidth;
   const remainingWidthForPadding = contentWidth - totalExplicitColWidths;
-  const paddingBetweenCols = remainingWidthForPadding / 4; // 4 gaps between 5 columns
+  const paddingBetweenCols = remainingWidthForPadding / 4; 
 
   const colStartX = {
     productName: margin,
@@ -150,7 +152,7 @@ export function generateInvoicePdf(
     doc.text('Price', colStartX.price + priceColWidth, yPos, { align: 'right' });
     doc.text('Subtotal', colStartX.subtotal + itemSubtotalColWidth, yPos, { align: 'right' });
     
-    yPos += (doc.getLineHeight('helvetica', 'bold', 9) / doc.internal.scaleFactor); 
+    yPos += doc.getLineHeight(); // Uses current font size (9)
     yPos += 2; 
     doc.line(margin, yPos, pageWidth - margin, yPos); 
     yPos += 3; 
@@ -163,7 +165,7 @@ export function generateInvoicePdf(
   // --- Table Items ---
   doc.setFontSize(8); 
   order.items.forEach((item) => {
-    const itemLineHeight = (doc.getLineHeight('helvetica', 'normal', 8) / doc.internal.scaleFactor);
+    const itemLineHeight = doc.getLineHeight(); // Font size 8 active
     const productNameLines = doc.splitTextToSize(item.name, productColWidth);
     const snBarcodeText = item.serialNumber || item.barcode || 'N/A';
     const snBarcodeLines = doc.splitTextToSize(snBarcodeText, snBarcodeColWidth);
@@ -182,8 +184,8 @@ export function generateInvoicePdf(
     doc.text(snBarcodeLines, colStartX.snBarcode, currentItemY);
 
     doc.text(item.billQuantity.toString(), colStartX.qty + qtyColWidth / 2, currentItemY, { align: 'center' }); 
-    doc.text(`Rs. ${(item.price).toFixed(2)}`, colStartX.price + priceColWidth, currentItemY, { align: 'right' }); 
-    doc.text(`Rs. ${(item.price * item.billQuantity).toFixed(2)}`, colStartX.subtotal + itemSubtotalColWidth, currentItemY, { align: 'right' });
+    doc.text(`₹${(item.price).toFixed(2)}`, colStartX.price + priceColWidth, currentItemY, { align: 'right' }); 
+    doc.text(`₹${(item.price * item.billQuantity).toFixed(2)}`, colStartX.subtotal + itemSubtotalColWidth, currentItemY, { align: 'right' });
     
     yPos += itemBlockHeight;
   });
@@ -206,18 +208,18 @@ export function generateInvoicePdf(
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.text('Subtotal:', summaryLabelX, yPos, { align: 'left' });
-  doc.text(`Rs. ${order.subtotal.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
+  doc.text(`₹${order.subtotal.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
   yPos += 5;
   doc.text(`GST (${(taxRate * 100).toFixed(0)}%):`, summaryLabelX, yPos, { align: 'left' });
-  doc.text(`Rs. ${order.taxAmount.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
+  doc.text(`₹${order.taxAmount.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
   yPos += 5;
 
   doc.setFontSize(10); 
   doc.setFont('helvetica', 'bold');
-  doc.line(summaryLabelX - 2 , yPos, pageWidth - margin, yPos); // Extend line slightly to the left
+  doc.line(summaryLabelX - 2 , yPos, pageWidth - margin, yPos); 
   yPos += 5;
   doc.text('Total Amount:', summaryLabelX, yPos, { align: 'left' });
-  doc.text(`Rs. ${order.totalAmount.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
+  doc.text(`₹${order.totalAmount.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
   yPos += 10; 
 
   // --- Footer ---
