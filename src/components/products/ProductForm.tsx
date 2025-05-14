@@ -23,9 +23,9 @@ import {
 import type { Product, Category } from "@/types";
 
 const productSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters.").max(100, "Name must be 100 characters or less."),
-  serialNumber: z.string().min(3, "Serial number must be at least 3 characters.").max(50, "Serial number must be 50 characters or less."),
-  barcode: z.string().min(3, "Barcode must be at least 3 characters.").max(50, "Barcode must be 50 characters or less."),
+  name: z.string().min(2, "Name must be at least 2 characters.").max(100000, "Name must be 100 characters or less."),
+  serialNumber: z.string().min(3, "Serial number must be at least 3 characters.").max(5000, "Serial number must be 50 characters or less."),
+  barcode: z.string().min(3, "Barcode must be at least 3 characters.").max(500, "Barcode must be 50 characters or less."),
   price: z.coerce.number().min(0.01, "Price must be greater than 0."),
   quantity: z.coerce.number().int().min(0, "Quantity cannot be negative."),
   categoryId: z.string().min(1, "Category is required."),
