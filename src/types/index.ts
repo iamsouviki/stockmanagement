@@ -45,7 +45,7 @@ export interface Order {
   subtotal: number;
   taxAmount: number;
   totalAmount: number;
-  orderDate: FirestoreTimestampType; // Keep as Timestamp for now
+  orderDate: FirestoreTimestampType | Date; // Keep as Timestamp for now
   createdAt?: FirestoreTimestampType;
   updatedAt?: FirestoreTimestampType;
 }
