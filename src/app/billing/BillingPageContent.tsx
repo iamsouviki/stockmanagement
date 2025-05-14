@@ -113,8 +113,8 @@ export default function BillingPageContent() {
                 categoryId: productDetails?.categoryId ?? '',
                 serialNumber: item.serialNumber || productDetails?.serialNumber || '',
                 barcode: item.barcode || productDetails?.barcode || '',
-                imageUrl: (productDetails?.imageUrl || item.imageUrl) ?? undefined,
-                imageHint: (productDetails?.imageHint || item.imageHint) ?? undefined,
+                imageUrl: item.imageUrl === null ? undefined : (productDetails?.imageUrl || item.imageUrl), // Handle null for imageUrl
+                imageHint: item.imageHint === null ? undefined : (productDetails?.imageHint || item.imageHint), // Handle null for imageHint
               };
             });
             setBillItems(itemsForBill);
@@ -543,7 +543,7 @@ export default function BillingPageContent() {
                     </AlertDescription>
                 </Alert>
                )}
-                 {paramIntent === 'edit' && originalOrderForEdit?.customerName !== "Walk-in Customer" && !selectedCustomer && areParamsReady && (
+                 {paramIntent === 'edit' && originalOrderForEdit && originalOrderForEdit.customerName !== "Walk-in Customer" && !selectedCustomer && areParamsReady && (
                     <Alert variant="default" className="border-accent text-accent bg-accent/10">
                         <Info className="h-5 w-5 !text-accent" />
                         <AlertTitle className="font-semibold">Editing Order for: {originalOrderForEdit.customerName}</AlertTitle>
