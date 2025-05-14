@@ -23,6 +23,7 @@ import {
   endBefore,
   limitToLast,
   type FieldValue,
+  type DocumentData, // Added for clarity
 } from 'firebase/firestore';
 import type { Product, Customer, Category, Order, OrderItemData } from '@/types';
 import { WALK_IN_CUSTOMER_ID } from '@/types'; 
@@ -159,7 +160,9 @@ export const findProductBySerialNumberOrBarcode = async (serialNumber?: string, 
     const snapshot = await getDocs(q);
     if (!snapshot.empty) {
       const docData = snapshot.docs[0];
-      return { id: docData.id, ...docData.data() } as unknown as Product;
+      // Use Object.assign() instead of spread for docData.data()
+      const combinedData = Object.assign({ id: docData.id }, docData.data());
+      return combinedData as unknown as Product;
     }
   }
 
@@ -168,7 +171,9 @@ export const findProductBySerialNumberOrBarcode = async (serialNumber?: string, 
     const snapshot = await getDocs(q);
     if (!snapshot.empty) {
       const docData = snapshot.docs[0];
-      return { id: docData.id, ...docData.data() } as unknown as Product;
+      // Use Object.assign() instead of spread for docData.data()
+      const combinedData = Object.assign({ id: docData.id }, docData.data());
+      return combinedData as unknown as Product;
     }
   }
   return null;
@@ -300,12 +305,20 @@ export const updateOrderAndAdjustStock = async (
     throw error; 
   }
 
+  // Ensure only allowed fields are updated and 'updatedAt' is handled correctly
   const finalOrderUpdateData: Partial<Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt'>> & { updatedAt: FieldValue } = {
-    ...updatedOrderPayload,
+    customerId: updatedOrderPayload.customerId,
+    customerName: updatedOrderPayload.customerName,
+    customerMobile: updatedOrderPayload.customerMobile,
+    customerAddress: updatedOrderPayload.customerAddress,
+    items: updatedOrderPayload.items,
+    subtotal: updatedOrderPayload.subtotal,
+    taxAmount: updatedOrderPayload.taxAmount,
+    totalAmount: updatedOrderPayload.totalAmount,
     updatedAt: serverTimestamp(),
   };
   
-  batch.update(orderRef, finalOrderUpdateData as any); // Using 'as any' to bypass strict type check for partial update with serverTimestamp
+  batch.update(orderRef, finalOrderUpdateData);
 
   await batch.commit();
   console.log("--- updateOrderAndAdjustStock END --- Order update batch committed successfully.");
