@@ -67,7 +67,7 @@ const getCollection = async <T extends {id: string}>(
 const getDocument = async <T extends Record<string, any>>(collectionName: string, id: string): Promise<T | null> => {
   const docRef = doc(db, collectionName, id);
   const docSnap = await getDoc(docRef);
-  return docSnap.exists() ? ({ id: docSnap.id, ...docSnap.data() } as T) : null;
+  return docSnap.exists() ? ({ id: docSnap.id, ...docSnap.data() } as unknown as T) : null;
 };
 
 const addDocument = async <T extends object>(collectionName: string, data: Omit<T, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
@@ -323,3 +323,4 @@ export const updateOrderAndAdjustStock = async (
   console.log("--- updateOrderAndAdjustStock END --- Order update batch committed successfully.");
   return orderId;
 };
+
