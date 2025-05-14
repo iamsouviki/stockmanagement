@@ -5,56 +5,58 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Users Collection
-    // - Allow anyone to create their own user document upon signup (AuthContext logic).
-    // - Allow authenticated users to read their own profile.
-    // - Allow authenticated users to read other user profiles (e.g., for display names, or for owner/admin to list users).
-    //   (Consider if this should be more restrictive based on app needs, e.g., only owner/admin can list all users).
-    // - Allow users to update their own profile (except role).
-    // - Allow owner/admin to update other users' profiles (including role, with specific logic in backend/frontend).
-    // - Allow owner to delete users (admins can delete employees, handled by backend/frontend logic).
+    // - Authenticated users can read their own profile.
+    // - Authenticated users can create their own profile document (e.g., during initial signup if AuthContext creates it).
+    // - Authenticated users can update their own profile (e.g., displayName, mobileNumber, but not role directly by themselves).
+    // - Only 'owner' role can delete user profiles (except their own, which they shouldn't do via app).
+    // - All authenticated users can list/query users (needed for AuthContext owner check and user management page).
     match /users/{userId} {
-      allow read: if request.auth != null; // Authenticated users can read user profiles
-      allow create: if request.auth.uid == userId; // User can create their own profile
-      allow update: if request.auth.uid == userId || 
-                       (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin']); // Self or owner/admin can update
-      allow delete: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner' ||
-                       (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' && resource.data.role == 'employee'); // Owner can delete anyone (except self indirectly), admin can delete employees
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid != userId && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
     }
 
     // Categories Collection
-    // - Allow authenticated users to read categories.
-    // - Allow owner, admin, or employee to write (create, update, delete) categories.
+    // - Authenticated users can read categories.
+    // - 'owner', 'admin', or 'employee' can create, update, delete categories.
     match /categories/{categoryId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
+      allow write: if request.auth != null &&
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
     }
 
     // Products Collection
-    // - Allow authenticated users to read products.
-    // - Allow owner, admin, or employee to write products.
+    // - Authenticated users can read products.
+    // - 'owner', 'admin', or 'employee' can create, update, delete products.
     match /products/{productId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
+      allow write: if request.auth != null &&
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
     }
 
     // Customers Collection
-    // - Allow authenticated users to read customers.
-    // - Allow owner, admin, or employee to write customers.
+    // - Authenticated users can read customers.
+    // - 'owner', 'admin', or 'employee' can create, update, delete customers.
     match /customers/{customerId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
+      allow write: if request.auth != null &&
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
     }
 
     // Orders Collection
-    // - Allow authenticated users to read orders (their own, or all if owner/admin - detailed checks might be needed if users should only see their own orders).
-    // - Allow owner, admin, or employee to create orders.
-    // - Allow owner to update orders.
-    // - Disallow direct deletion of orders (archive or mark as cancelled instead).
+    // - Authenticated users can read orders.
+    // - 'owner', 'admin', or 'employee' can create orders.
+    // - Only 'owner' can update orders.
+    // - Deletion of orders is typically restricted, only 'owner' can delete.
     match /orders/{orderId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
-      allow update: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
-      allow delete: if false; // Generally, orders should not be hard-deleted
+      allow create: if request.auth != null &&
+                        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin', 'employee'];
+      allow update: if request.auth != null &&
+                        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
+      allow delete: if request.auth != null &&
+                        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
     }
   }
 }

@@ -6,8 +6,17 @@ import type { Metadata, ResolvingMetadata } from 'next';
 import { Suspense } from 'react';
 import { Skeleton } from '@/components/ui/skeleton'; // For a basic fallback
 
+// Define explicit types for params and props
+interface OrderPageParams {
+  orderId: string;
+}
+
+interface OrderPageProps {
+  params: OrderPageParams;
+}
+
 // Function to generate static paths for orders
-export async function generateStaticParams() {
+export async function generateStaticParams(): Promise<OrderPageParams[]> {
   try {
     const orders = await getOrders(); // Fetch all orders
     return orders.map((order) => ({
@@ -19,19 +28,11 @@ export async function generateStaticParams() {
   }
 }
 
-// Optional: If you want dynamic metadata based on the orderId
-// Removed type alias Props as it was causing a conflict with an internal PageProps constraint.
-// type Props = {
-//   params: { orderId: string }
-// }
-
 export async function generateMetadata(
-  { params }: { params: { orderId: string } }, // Used inline type
+  { params }: OrderPageProps, // Use OrderPageProps
   parent: ResolvingMetadata
 ): Promise<Metadata> {
   const orderId = params.orderId;
-  // In a real scenario, you might fetch minimal order data here to set a dynamic title
-  // For now, a generic title:
   return {
     title: `Order Details - ${orderId.substring(0, 6)}...`,
     description: `View details for order ${orderId}`,
@@ -52,7 +53,7 @@ function OrderDetailLoadingSkeleton() {
   }
 
 
-export default function OrderDetailPage({ params }: { params: { orderId: string } }) { // Used inline type
+export default function OrderDetailPage({ params }: OrderPageProps) { // Use OrderPageProps
   return (
     <Suspense fallback={<OrderDetailLoadingSkeleton />}>
       <OrderDetailPageClient orderId={params.orderId} />
