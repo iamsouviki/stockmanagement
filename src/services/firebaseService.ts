@@ -16,8 +16,8 @@ import {
   orderBy,
   limit,
   startAfter,
-  type FieldPath, 
-  type OrderByDirection, 
+  type FieldPath,
+  type OrderByDirection,
   type DocumentSnapshot,
   type QueryDocumentSnapshot,
   endBefore,
@@ -26,19 +26,19 @@ import {
   type DocumentData, // Added for clarity
 } from 'firebase/firestore';
 import type { Product, Customer, Category, Order, OrderItemData } from '@/types';
-import { WALK_IN_CUSTOMER_ID } from '@/types'; 
+import { WALK_IN_CUSTOMER_ID } from '@/types';
 import { format } from 'date-fns';
 
 // Generic CRUD operations
 const getCollection = async <T extends {id: string}>(
   collectionName: string,
-  orderByField?: Extract<keyof T, string> | FieldPath, 
+  orderByField?: Extract<keyof T, string> | FieldPath,
   orderDirection: OrderByDirection = 'asc',
   pageLimit?: number, // Optional: if not provided, fetches all
   startAfterDoc?: QueryDocumentSnapshot | null, // For 'next' page
   endBeforeDoc?: QueryDocumentSnapshot | null // For 'prev' page
 ): Promise<{ data: T[], firstDoc: QueryDocumentSnapshot | null, lastDoc: QueryDocumentSnapshot | null }> => {
-  let q = query(collection(db, collectionName)); 
+  let q = query(collection(db, collectionName));
   if (orderByField) {
     q = query(q, orderBy(orderByField, orderDirection));
   }
@@ -57,7 +57,7 @@ const getCollection = async <T extends {id: string}>(
 
   const snapshot = await getDocs(q);
   const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
-  
+
   return {
     data,
     firstDoc: snapshot.docs.length > 0 ? snapshot.docs[0] : null,
@@ -101,7 +101,7 @@ export const getCategories = async (): Promise<Category[]> => {
 export const addCategory = async (data: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>): Promise<Category> => {
   const id = await addDocument<Category>('categories', data);
   const now = Timestamp.now();
-  return { id, ...data, createdAt: now, updatedAt: now }; 
+  return { id, ...data, createdAt: now, updatedAt: now };
 };
 export const updateCategory = (id: string, data: Partial<Omit<Category, 'id' | 'createdAt' | 'updatedAt'>>) => updateDocument<Category>('categories', id, data);
 export const deleteCategory = (id: string) => deleteDocument('categories', id);
@@ -116,13 +116,13 @@ export const findCategoryByNameOrCreate = async (name: string): Promise<Category
     return { id: docData.id, ...docData.data() } as Category;
   } else {
     const newCategoryData = { name: trimmedName };
-    return addCategory(newCategoryData); 
+    return addCategory(newCategoryData);
   }
 };
 
 
 // Products Service
-export const getProducts = async (): Promise<Product[]> => { 
+export const getProducts = async (): Promise<Product[]> => {
   const { data } = await getCollection<Product>('products', 'name');
   return data;
 }
@@ -135,10 +135,10 @@ export const getProductsPaginated = async (
   endBeforeDoc?: QueryDocumentSnapshot | null
 ): Promise<{ products: Product[], firstDoc: QueryDocumentSnapshot | null, lastDoc: QueryDocumentSnapshot | null }> => {
   const { data, firstDoc, lastDoc } = await getCollection<Product>(
-    'products', 
-    orderByField, 
-    orderDirection, 
-    itemsPerPage, 
+    'products',
+    orderByField,
+    orderDirection,
+    itemsPerPage,
     startAfterDoc,
     endBeforeDoc
   );
@@ -193,10 +193,31 @@ export const findCustomerByMobile = async (mobileNumber: string): Promise<Custom
 
 
 // Orders Service
+
+// Function to get all orders (for dashboard charts)
 export const getOrders = async (): Promise<Order[]> => {
     const { data } = await getCollection<Order>('orders', 'orderDate', 'desc');
     return data;
 }
+
+export const getOrdersPaginated = async (
+  itemsPerPage: number,
+  orderByField: keyof Order | FieldPath = 'orderDate',
+  orderDirection: OrderByDirection = 'desc',
+  startAfterDoc?: QueryDocumentSnapshot | null,
+  endBeforeDoc?: QueryDocumentSnapshot | null
+): Promise<{ orders: Order[], firstDoc: QueryDocumentSnapshot | null, lastDoc: QueryDocumentSnapshot | null }> => {
+    const { data, firstDoc, lastDoc } = await getCollection<Order>(
+    'orders',
+    orderByField,
+    orderDirection,
+    itemsPerPage,
+    startAfterDoc,
+    endBeforeDoc
+  );
+  return { orders: data, firstDoc, lastDoc };
+}
+
 export const getOrder = (id: string) => getDocument<Order>('orders', id);
 
 export const addOrderAndDecrementStock = async (
@@ -206,17 +227,17 @@ export const addOrderAndDecrementStock = async (
   const batch = writeBatch(db);
   const now = new Date();
   const orderNumber = `ORD-${format(now, 'yyyyMMdd-HHmmssSSS')}`;
-  
-  const completeOrderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> & { 
-    orderDate: Timestamp; 
-    createdAt: FieldValue; 
-    updatedAt: FieldValue; 
-  } = { 
-    ...orderData, 
+
+  const completeOrderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> & {
+    orderDate: Timestamp;
+    createdAt: FieldValue;
+    updatedAt: FieldValue;
+  } = {
+    ...orderData,
     orderNumber,
     orderDate: Timestamp.fromDate(now),
-    createdAt: serverTimestamp(), 
-    updatedAt: serverTimestamp(), 
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
   };
 
   const newOrderRef = doc(collection(db, 'orders'));
@@ -245,7 +266,7 @@ export const addOrderAndDecrementStock = async (
 export const updateOrderAndAdjustStock = async (
   orderId: string,
   updatedOrderPayload: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'>,
-  originalOrder: Order 
+  originalOrder: Order
 ): Promise<string> => {
   console.log("--- updateOrderAndAdjustStock START ---");
   console.log("Order ID to Update:", orderId);
@@ -253,7 +274,7 @@ export const updateOrderAndAdjustStock = async (
   const batch = writeBatch(db);
   const orderRef = doc(db, 'orders', orderId);
 
-  const stockAdjustments = new Map<string, number>(); 
+  const stockAdjustments = new Map<string, number>();
 
   originalOrder.items.forEach(item => {
     stockAdjustments.set(item.productId, (stockAdjustments.get(item.productId) || 0) + item.billQuantity);
@@ -264,7 +285,7 @@ export const updateOrderAndAdjustStock = async (
   });
 
   const productUpdatePromises = Array.from(stockAdjustments.entries()).map(async ([productId, netStockChangeToApply]) => {
-    if (netStockChangeToApply === 0) return; 
+    if (netStockChangeToApply === 0) return;
 
     const productRef = doc(db, 'products', productId);
     try {
@@ -272,7 +293,7 @@ export const updateOrderAndAdjustStock = async (
       if (productSnap.exists()) {
         const currentDBStock = productSnap.data().quantity || 0;
         const newDBStock = currentDBStock + netStockChangeToApply;
-        
+
         if (newDBStock < 0) {
           throw new Error(
             `Insufficient stock for product '${productSnap.data().name || productId}'. ` +
@@ -282,15 +303,15 @@ export const updateOrderAndAdjustStock = async (
         }
         batch.update(productRef, { quantity: newDBStock, updatedAt: serverTimestamp() });
       } else {
-        if (netStockChangeToApply > 0) { 
+        if (netStockChangeToApply > 0) {
              console.warn(`Product ID ${productId} not found. Order update implies returning ${netStockChangeToApply} units. Stock cannot be returned.`);
-        } else { 
+        } else {
              throw new Error(`Product ID ${productId} not found. Cannot take stock for non-existent product during order update.`);
         }
       }
     } catch (error) {
       console.error(`Error preparing stock update for product ${productId}:`, error);
-      throw error; 
+      throw error;
     }
   });
 
@@ -298,12 +319,16 @@ export const updateOrderAndAdjustStock = async (
     await Promise.all(productUpdatePromises);
   } catch (error) {
     console.error("Failed during product stock validation for update:", error);
-    throw error; 
+    throw error;
   }
-
-  // Ensure only allowed fields are updated and 'updatedAt' is handled correctly
-  // The type here makes sure 'updatedAt' is FieldValue, and other fields match what updatedOrderPayload provides
+  
   const finalOrderUpdateData: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'> & { updatedAt: FieldValue } = {
+    // Retain original orderNumber and orderDate unless they are part of updatedOrderPayload
+    // customerId: originalOrder.customerId, // Keep original if not changed
+    // customerName: originalOrder.customerName, 
+    // customerMobile: originalOrder.customerMobile,
+    // customerAddress: originalOrder.customerAddress,
+
     customerId: updatedOrderPayload.customerId,
     customerName: updatedOrderPayload.customerName,
     customerMobile: updatedOrderPayload.customerMobile,
@@ -321,4 +346,3 @@ export const updateOrderAndAdjustStock = async (
   console.log("--- updateOrderAndAdjustStock END --- Order update batch committed successfully.");
   return orderId;
 };
-
