@@ -160,9 +160,7 @@ export const findProductBySerialNumberOrBarcode = async (serialNumber?: string, 
     const snapshot = await getDocs(q);
     if (!snapshot.empty) {
       const docData = snapshot.docs[0];
-      // Use Object.assign() instead of spread for docData.data()
-      const combinedData = Object.assign({ id: docData.id }, docData.data());
-      return combinedData as unknown as Product;
+      return Object.assign({ id: docData.id }, docData.data()) as unknown as Product;
     }
   }
 
@@ -171,9 +169,7 @@ export const findProductBySerialNumberOrBarcode = async (serialNumber?: string, 
     const snapshot = await getDocs(q);
     if (!snapshot.empty) {
       const docData = snapshot.docs[0];
-      // Use Object.assign() instead of spread for docData.data()
-      const combinedData = Object.assign({ id: docData.id }, docData.data());
-      return combinedData as unknown as Product;
+      return Object.assign({ id: docData.id }, docData.data()) as unknown as Product;
     }
   }
   return null;
@@ -306,7 +302,8 @@ export const updateOrderAndAdjustStock = async (
   }
 
   // Ensure only allowed fields are updated and 'updatedAt' is handled correctly
-  const finalOrderUpdateData: Partial<Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt'>> & { updatedAt: FieldValue } = {
+  // The type here makes sure 'updatedAt' is FieldValue, and other fields match what updatedOrderPayload provides
+  const finalOrderUpdateData: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'> & { updatedAt: FieldValue } = {
     customerId: updatedOrderPayload.customerId,
     customerName: updatedOrderPayload.customerName,
     customerMobile: updatedOrderPayload.customerMobile,
