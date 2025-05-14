@@ -141,7 +141,7 @@ export function generateInvoicePdf(
     yPos += 1; 
     doc.setLineWidth(0.1);
     doc.line(margin, yPos, pageWidth - margin, yPos); 
-    yPos += 4; 
+    yPos += 5; 
 
     doc.setFontSize(9); 
     doc.setFont('helvetica', 'bold');
@@ -153,10 +153,9 @@ export function generateInvoicePdf(
     doc.text('Subtotal', colStartX.subtotal + itemSubtotalColWidth, yPos, { align: 'right' });
     
     doc.setFontSize(9); // Ensure font size is set before calling getLineHeight
-    yPos += doc.getLineHeight(); 
-    yPos += 2; 
+    yPos += 4; 
     doc.line(margin, yPos, pageWidth - margin, yPos); 
-    yPos += 3; 
+    yPos += 5; 
     doc.setFont('helvetica', 'normal'); 
     doc.setFontSize(8); 
   };
@@ -164,15 +163,16 @@ export function generateInvoicePdf(
   drawTableHeaders();
 
   // --- Table Items ---
-  doc.setFontSize(8); 
+  doc.setFontSize(9); 
+  doc.setFont('helvetica', 'normal');
   order.items.forEach((item) => {
-    doc.setFontSize(8); // Ensure font size is set before calling getLineHeight
+    doc.setFontSize(9); // Ensure font size is set before calling getLineHeight
     const itemLineHeight = doc.getLineHeight(); 
     const productNameLines = doc.splitTextToSize(item.name, productColWidth - 2); // -2 for padding
     const snBarcodeText = item.serialNumber || item.barcode || 'N/A';
     const snBarcodeLines = doc.splitTextToSize(snBarcodeText, snBarcodeColWidth -2); // -2 for padding
     const maxLinesPerItem = Math.max(productNameLines.length, snBarcodeLines.length, 1);
-    const itemBlockHeight = maxLinesPerItem * itemLineHeight + 2; 
+    const itemBlockHeight = maxLinesPerItem * itemLineHeight; 
 
     if (yPos + itemBlockHeight > pageHeight - (margin + 35)) { 
       doc.addPage();
@@ -186,8 +186,8 @@ export function generateInvoicePdf(
     doc.text(snBarcodeLines, colStartX.snBarcode + 1, currentItemY); // +1 for padding
 
     doc.text(item.billQuantity.toString(), colStartX.qty + qtyColWidth / 2, currentItemY, { align: 'center' }); 
-    doc.text(`₹${(item.price).toFixed(2)}`, colStartX.price + priceColWidth -1 , currentItemY, { align: 'right' });  // -1 for padding
-    doc.text(`₹${(item.price * item.billQuantity).toFixed(2)}`, colStartX.subtotal + itemSubtotalColWidth -1, currentItemY, { align: 'right' }); // -1 for padding
+    doc.text(`Rs. ${(item.price).toFixed(2)}`, colStartX.price + priceColWidth -1 , currentItemY, { align: 'right' });  // -1 for padding
+    doc.text(`Rs. ${(item.price * item.billQuantity).toFixed(2)}`, colStartX.subtotal + itemSubtotalColWidth -1, currentItemY, { align: 'right' }); // -1 for padding
     
     yPos += itemBlockHeight;
   });
@@ -210,18 +210,18 @@ export function generateInvoicePdf(
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.text('Subtotal:', summaryLabelX, yPos, { align: 'left' });
-  doc.text(`₹${order.subtotal.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
+  doc.text(`Rs. ${order.subtotal.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
   yPos += 5;
   doc.text(`GST (${(taxRate * 100).toFixed(0)}%):`, summaryLabelX, yPos, { align: 'left' });
-  doc.text(`₹${order.taxAmount.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
+  doc.text(`Rs. ${order.taxAmount.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
   yPos += 5;
 
   doc.setFontSize(10); 
-  doc.setFont('helvetica', 'bold');
+  doc.setFont('helvetica', 'normal');
   doc.line(summaryLabelX - 2 , yPos, pageWidth - margin, yPos); 
   yPos += 5;
   doc.text('Total Amount:', summaryLabelX, yPos, { align: 'left' });
-  doc.text(`₹${order.totalAmount.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
+  doc.text(`Rs. ${order.totalAmount.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
   yPos += 10; 
 
   // --- Footer ---
