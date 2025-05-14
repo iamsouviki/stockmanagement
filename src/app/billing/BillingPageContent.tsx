@@ -25,10 +25,14 @@ import { generateInvoicePdf } from '@/lib/pdfGenerator';
 
 export default function BillingPageContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const fromOrderId = searchParams.get('fromOrder');
-  const intent = searchParams.get('intent'); 
+  const searchParams = useSearchParams(); // Hook is called here
 
+  // State for parameters from URL
+  const [paramFromOrder, setParamFromOrder] = useState<string | null>(null);
+  const [paramIntent, setParamIntent] = useState<string | null>(null);
+  const [areParamsReady, setAreParamsReady] = useState(false);
+
+  // Bill-specific state
   const [billItems, setBillItems] = useState<BillItem[]>([]);
   const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
@@ -42,14 +46,31 @@ export default function BillingPageContent() {
   const [originalOrderForEdit, setOriginalOrderForEdit] = useState<Order | null>(null);
   const [isFinalizing, setIsFinalizing] = useState(false);
 
-
   const { toast } = useToast();
 
-  const pageTitle = intent === 'edit' && fromOrderId ? "Edit Order" : fromOrderId ? "Re-create Bill" : "Create New Bill";
-  const pageDescription = intent === 'edit' && fromOrderId
+  // Effect to process searchParams once they are available
+  useEffect(() => {
+    // Check if searchParams is not null and has been initialized
+    // For static export, searchParams might be initially empty or null on server, then populated on client
+    if (searchParams.toString()) { // Check if searchParams has any value
+      setParamFromOrder(searchParams.get('fromOrder'));
+      setParamIntent(searchParams.get('intent'));
+      setAreParamsReady(true);
+    } else if (!searchParams.get('fromOrder') && !searchParams.get('intent')) {
+      // If there are no params in the URL, we can consider params ready
+      setAreParamsReady(true);
+    }
+    // If searchParams.toString() is empty but we expect params,
+    // areParamsReady remains false until client-side JS populates searchParams.
+    // The Suspense boundary in page.tsx should handle this.
+  }, [searchParams]);
+  
+
+  const pageTitle = areParamsReady && paramIntent === 'edit' && paramFromOrder ? "Edit Order" : areParamsReady && paramFromOrder ? "Re-create Bill" : "Create New Bill";
+  const pageDescription = areParamsReady && paramIntent === 'edit' && paramFromOrder
     ? "Modify the items and customer details for this order and generate an updated bill."
     : "Add products by barcode/SN and generate a bill for your customer.";
-  const finalizeButtonText = intent === 'edit' && fromOrderId ? "Update Order & Print" : "Finalize & Generate Bill";
+  const finalizeButtonText = areParamsReady && paramIntent === 'edit' && paramFromOrder ? "Update Order & Print" : "Finalize & Generate Bill";
 
 
   const fetchProductData = useCallback(async () => {
@@ -69,13 +90,15 @@ export default function BillingPageContent() {
   }, [fetchProductData]);
 
   useEffect(() => {
-    if (fromOrderId && availableProducts.length > 0) {
+    if (!areParamsReady) return; // Wait for params to be processed
+
+    if (paramFromOrder && availableProducts.length > 0) {
       const loadOrderData = async () => {
         setIsLoadingOrderData(true);
         try {
-          const order = await getOrderById(fromOrderId);
+          const order = await getOrderById(paramFromOrder);
           if (order) {
-            if (intent === 'edit') {
+            if (paramIntent === 'edit') {
               setOriginalOrderForEdit(order); 
             }
             const itemsForBill: BillItem[] = order.items.map(item => {
@@ -89,7 +112,7 @@ export default function BillingPageContent() {
                 billQuantity: item.billQuantity, 
                 categoryId: productDetails?.categoryId ?? '',
                 serialNumber: item.serialNumber || productDetails?.serialNumber || '',
-                barcode: item.barcode || productDetails?.barcode || '',
+                barcode: productDetails?.barcode || item.barcode,
                 imageUrl: productDetails?.imageUrl || item.imageUrl,
                 imageHint: productDetails?.imageHint || item.imageHint,
               };
@@ -102,7 +125,7 @@ export default function BillingPageContent() {
             } else if (order.customerMobile && order.customerId === WALK_IN_CUSTOMER_ID) {
               setCustomerSearchTerm(order.customerMobile);
             }
-            const toastMessage = intent === 'edit' ? `Order ${order.orderNumber} loaded for editing.` : `Items from order ${order.orderNumber} loaded for re-billing.`;
+            const toastMessage = paramIntent === 'edit' ? `Order ${order.orderNumber} loaded for editing.` : `Items from order ${order.orderNumber} loaded for re-billing.`;
             toast({ title: "Order Loaded", description: toastMessage });
           } else {
             toast({ title: "Error", description: "Order not found for re-billing/editing.", variant: "destructive" });
@@ -116,16 +139,18 @@ export default function BillingPageContent() {
         setIsLoadingOrderData(false);
       };
       loadOrderData();
-    } else if (!fromOrderId) {
+    } else if (!paramFromOrder) { // No fromOrder, new bill
       setOriginalOrderForEdit(null); 
       setBillItems([]);
       setSelectedCustomer(null);
       setCustomerSearchTerm("");
     }
-  }, [fromOrderId, availableProducts, router, intent, toast]); 
+  }, [areParamsReady, paramFromOrder, paramIntent, availableProducts, router, toast]); 
 
 
   const handleProductAdd = (barcodeOrSn: string) => {
+    if (!areParamsReady) return; // Ensure params (and thus intent) are processed
+
     const productToAdd = availableProducts.find(
       (p) => p.barcode === barcodeOrSn || p.serialNumber === barcodeOrSn
     );
@@ -144,14 +169,14 @@ export default function BillingPageContent() {
     
     let stockAvailableForThisItem = productToAdd.quantity;
 
-    if (intent === 'edit' && originalOrderForEdit) {
+    if (paramIntent === 'edit' && originalOrderForEdit) {
       const originalItemInOrder = originalOrderForEdit.items.find(item => item.productId === productToAdd.id);
       if (originalItemInOrder) {
         stockAvailableForThisItem += originalItemInOrder.billQuantity; 
       }
     }
 
-    if (productToAdd.quantity <= 0 && !existingItem && !(intent === 'edit' && stockAvailableForThisItem > currentBillQuantity)) { 
+    if (productToAdd.quantity <= 0 && !existingItem && !(paramIntent === 'edit' && stockAvailableForThisItem > currentBillQuantity)) { 
          toast({
            title: "Out of Stock",
            description: `Product "${productToAdd.name}" is out of stock.`,
@@ -194,6 +219,7 @@ export default function BillingPageContent() {
   };
 
   const handleUpdateQuantity = (itemId: string, newQuantity: number) => {
+    if (!areParamsReady) return;
     const productInStock = availableProducts.find(p => p.id === itemId);
     if (!productInStock) return;
 
@@ -204,7 +230,7 @@ export default function BillingPageContent() {
     
     let stockAvailableForThisItem = productInStock.quantity; 
 
-    if (intent === 'edit' && originalOrderForEdit) {
+    if (paramIntent === 'edit' && originalOrderForEdit) {
       const originalItemInOrder = originalOrderForEdit.items.find(item => item.productId === itemId);
       if (originalItemInOrder) {
         stockAvailableForThisItem += originalItemInOrder.billQuantity;
@@ -282,7 +308,7 @@ export default function BillingPageContent() {
       if (existingCustomersWithMobile.length > 0) {
         toast({
           title: "Mobile Number Exists",
-          description: "This mobile number is already associated with another customer customer.",
+          description: "This mobile number is already associated with another customer.",
           variant: "destructive",
         });
         return;
@@ -290,7 +316,7 @@ export default function BillingPageContent() {
 
       const customerData = {
         ...data,
-        imageUrl: `https://picsum.photos/seed/${encodeURIComponent(data.name.split(" ")[0])}/200/200`,
+        imageUrl: `https://placehold.co/200x200.png`, // Placeholder image
         imageHint: "person avatar",
       };
       const newCustomerId = await addCustomer(customerData);
@@ -315,6 +341,10 @@ export default function BillingPageContent() {
 
 
   const handleFinalizeBill = async () => {
+    if (!areParamsReady) {
+        toast({ title: "Processing...", description: "Please wait, page is initializing.", variant: "default"});
+        return;
+    }
     setIsFinalizing(true);
     
     if (billItems.length === 0) {
@@ -353,7 +383,8 @@ export default function BillingPageContent() {
       customerName = selectedCustomer.name;
       customerMobile = selectedCustomer.mobileNumber;
       customerAddress = selectedCustomer.address || null;
-    } else if (intent === 'edit' && originalOrderForEdit && originalOrderForEdit.customerName !== "Walk-in Customer") {
+    } else if (paramIntent === 'edit' && originalOrderForEdit && originalOrderForEdit.customerName !== "Walk-in Customer") {
+      // If editing and no new customer is selected, retain original customer from the order being edited
       customerId = originalOrderForEdit.customerId;
       customerName = originalOrderForEdit.customerName;
       customerMobile = originalOrderForEdit.customerMobile;
@@ -376,8 +407,8 @@ export default function BillingPageContent() {
       let orderIdForResult: string;
       let orderNumberForResult: string | undefined;
 
-      if (intent === 'edit' && fromOrderId && originalOrderForEdit) {
-        orderIdForResult = await updateOrderAndAdjustStock(fromOrderId, orderPayload, originalOrderForEdit);
+      if (paramIntent === 'edit' && paramFromOrder && originalOrderForEdit) {
+        orderIdForResult = await updateOrderAndAdjustStock(paramFromOrder, orderPayload, originalOrderForEdit);
         orderNumberForResult = originalOrderForEdit.orderNumber; 
          toast({
           title: "Order Updated!",
@@ -417,7 +448,7 @@ export default function BillingPageContent() {
       router.push(`/orders/${orderIdForResult}`); 
 
     } catch (error: any) {
-      const actionType = (intent === 'edit' && originalOrderForEdit) ? "Update" : "Finalization";
+      const actionType = (paramIntent === 'edit' && originalOrderForEdit) ? "Update" : "Finalization";
       console.error(`Error during bill ${actionType.toLowerCase()}:`, error);
       toast({
         title: `Bill ${actionType} Failed`,
@@ -430,14 +461,15 @@ export default function BillingPageContent() {
     }
   };
 
-  if ((isLoadingProducts && !fromOrderId) || (fromOrderId && isLoadingOrderData)) {
+  if (!areParamsReady || (isLoadingProducts && !paramFromOrder) || (paramFromOrder && isLoadingOrderData && areParamsReady)) {
     return <BillingPageLoadingSkeleton />;
   }
-
+  
   const isFinalizeButtonDisabled = 
-    (intent === 'edit' && (!originalOrderForEdit || isLoadingOrderData)) || 
+    (paramIntent === 'edit' && (!originalOrderForEdit || isLoadingOrderData)) || 
     isLoadingProducts || 
-    isFinalizing;
+    isFinalizing ||
+    !areParamsReady;
 
   return (
     <div className="space-y-6 md:space-y-8">
@@ -502,7 +534,7 @@ export default function BillingPageContent() {
                   </Button>
                 </div>
               )}
-               {!selectedCustomer && !customerSearchTerm && !searchedMobileForNotFound && !(intent === 'edit' && originalOrderForEdit?.customerId && originalOrderForEdit.customerName !== "Walk-in Customer" ) && (
+               {!selectedCustomer && !customerSearchTerm && !searchedMobileForNotFound && !(paramIntent === 'edit' && originalOrderForEdit?.customerId && originalOrderForEdit.customerName !== "Walk-in Customer" ) && (
                  <Alert variant="default" className="border-primary/50 text-primary bg-primary/5">
                     <Info className="h-5 w-5 !text-primary" />
                     <AlertTitle className="font-semibold">Tip</AlertTitle>
@@ -511,7 +543,7 @@ export default function BillingPageContent() {
                     </AlertDescription>
                 </Alert>
                )}
-                 {intent === 'edit' && originalOrderForEdit?.customerName !== "Walk-in Customer" && !selectedCustomer && (
+                 {paramIntent === 'edit' && originalOrderForEdit?.customerName !== "Walk-in Customer" && !selectedCustomer && areParamsReady && (
                     <Alert variant="default" className="border-accent text-accent bg-accent/10">
                         <Info className="h-5 w-5 !text-accent" />
                         <AlertTitle className="font-semibold">Editing Order for: {originalOrderForEdit.customerName}</AlertTitle>
@@ -565,3 +597,5 @@ export default function BillingPageContent() {
     </div>
   );
 }
+
+    

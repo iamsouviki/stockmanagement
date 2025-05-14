@@ -1,12 +1,14 @@
+
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
+  output: 'export', // Essential for static export to 'out' directory
   typescript: {
-    ignoreBuildErrors: false, // Changed to false
+    ignoreBuildErrors: false, 
   },
   eslint: {
-    ignoreDuringBuilds: true, // Consider setting to false in the future for stricter linting
+    ignoreDuringBuilds: true, 
   },
   images: {
     remotePatterns: [
@@ -16,8 +18,17 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      { // Added for placehold.co
+        protocol: 'https',
+        hostname: 'placehold.co',
+        port: '',
+        pathname: '/**',
+      }
     ],
+    unoptimized: true // Necessary for `next export` with `next/image`
   },
 };
 
 export default nextConfig;
+
+    
