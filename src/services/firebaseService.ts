@@ -22,6 +22,7 @@ import {
   type QueryDocumentSnapshot,
   endBefore,
   limitToLast,
+  type FieldValue, // Added FieldValue
 } from 'firebase/firestore';
 import type { Product, Customer, Category, Order, OrderItemData } from '@/types';
 import { WALK_IN_CUSTOMER_ID } from '@/types'; 
@@ -79,11 +80,11 @@ const addDocument = async <T extends object>(collectionName: string, data: Omit<
   return docRef.id;
 };
 
-const updateDocument = async <T extends object>(collectionName: string, id: string, data: Partial<Omit<T, 'id' | 'createdAt' | 'updatedAt'>>): Promise<void> => {
+const updateDocument = async <T extends object>(collectionName: string, id: string, data: Partial<Omit<T, 'id' | 'createdAt' | 'updatedAt'>> & { updatedAt?: FieldValue }): Promise<void> => {
   const docRef = doc(db, collectionName, id);
   await updateDoc(docRef, {
     ...data,
-    updatedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(), // This is fine here as updateDoc expects UpdateData<T>
   });
 };
 
@@ -208,7 +209,7 @@ export const addOrderAndDecrementStock = async (
   const now = new Date();
   const orderNumber = `ORD-${format(now, 'yyyyMMdd-HHmmssSSS')}`;
   
-  const completeOrderData = { 
+  const completeOrderData: Omit<Order, 'id'> & { createdAt: FieldValue, updatedAt: FieldValue } = { 
     ...orderData, 
     orderNumber,
     orderDate: Timestamp.fromDate(now),
@@ -246,8 +247,6 @@ export const updateOrderAndAdjustStock = async (
 ): Promise<string> => {
   console.log("--- updateOrderAndAdjustStock START ---");
   console.log("Order ID to Update:", orderId);
-  // console.log("Original Order:", JSON.stringify(originalOrder, null, 2));
-  // console.log("Updated Payload:", JSON.stringify(updatedOrderPayload, null, 2));
 
   const batch = writeBatch(db);
   const orderRef = doc(db, 'orders', orderId);
@@ -257,12 +256,10 @@ export const updateOrderAndAdjustStock = async (
   originalOrder.items.forEach(item => {
     stockAdjustments.set(item.productId, (stockAdjustments.get(item.productId) || 0) + item.billQuantity);
   });
-  // console.log("Stock adjustments after crediting original items:", JSON.stringify(Object.fromEntries(stockAdjustments)));
 
   updatedOrderPayload.items.forEach(item => {
     stockAdjustments.set(item.productId, (stockAdjustments.get(item.productId) || 0) - item.billQuantity);
   });
-  // console.log("Net stock adjustments (positive means add back to stock, negative means take more from stock):", JSON.stringify(Object.fromEntries(stockAdjustments)));
 
   const productUpdatePromises = Array.from(stockAdjustments.entries()).map(async ([productId, netStockChangeToApply]) => {
     if (netStockChangeToApply === 0) return; 
@@ -272,12 +269,8 @@ export const updateOrderAndAdjustStock = async (
       const productSnap = await getDoc(productRef);
       if (productSnap.exists()) {
         const currentDBStock = productSnap.data().quantity || 0;
-        // If netStockChangeToApply is positive, it means original_billed > new_billed, so stock should INCREASE.
-        // If netStockChangeToApply is negative, it means original_billed < new_billed, so stock should DECREASE.
         const newDBStock = currentDBStock + netStockChangeToApply;
         
-        // console.log(`Product ID: ${productId}, Name: ${productSnap.data().name}, Current DB Stock: ${currentDBStock}, Net Change (to add to stock): ${netStockChangeToApply}, New DB Stock: ${newDBStock}`);
-
         if (newDBStock < 0) {
           throw new Error(
             `Insufficient stock for product '${productSnap.data().name || productId}'. ` +
@@ -306,21 +299,20 @@ export const updateOrderAndAdjustStock = async (
     throw error; 
   }
 
-  const finalOrderUpdateData: Partial<Order> = {
-    ...updatedOrderPayload, 
+  const finalOrderUpdateData: Partial<Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'>> & { updatedAt: FieldValue } = {
+    ...updatedOrderPayload,
     updatedAt: serverTimestamp(),
   };
   
-  delete (finalOrderUpdateData as any).id;
-  delete (finalOrderUpdateData as any).orderNumber; 
-  delete (finalOrderUpdateData as any).orderDate;   
-  delete (finalOrderUpdateData as any).createdAt; 
+  // id, orderNumber, orderDate, createdAt should not be part of the update payload for an existing document in this manner
+  // They are either fixed or handled differently (like updatedAt which is now explicitly a FieldValue)
+  // The existing properties from updatedOrderPayload are already spread.
 
-  batch.update(orderRef, finalOrderUpdateData);
-  // console.log("Order document update prepared for batch:", JSON.stringify(finalOrderUpdateData, null, 2));
+  batch.update(orderRef, finalOrderUpdateData as any); // Cast to any to satisfy batch.update with FieldValue
 
   await batch.commit();
   console.log("--- updateOrderAndAdjustStock END --- Order update batch committed successfully.");
   return orderId;
 };
+
 
