@@ -1,3 +1,4 @@
+
 // src/lib/pdfGenerator.ts
 import jsPDF from 'jspdf';
 import { format } from 'date-fns';
@@ -121,11 +122,11 @@ export function generateInvoicePdf(
 
   // --- Column definitions for A4 (in mm) ---
   // Adjusted widths to prevent overflow, especially for price/subtotal columns
-  const productColWidth = contentWidth * 0.30; // 30%
-  const snBarcodeColWidth = contentWidth * 0.20; // 20%
-  const qtyColWidth = contentWidth * 0.08;  // 8%
-  const priceColWidth = contentWidth * 0.20; // 20%
-  const itemSubtotalColWidth = contentWidth * 0.22; // 22%
+  const productColWidth = contentWidth * 0.28;    // Was 0.30
+  const snBarcodeColWidth = contentWidth * 0.18;  // Was 0.20
+  const qtyColWidth = contentWidth * 0.08;        // Unchanged
+  const priceColWidth = contentWidth * 0.23;      // Was 0.20
+  const itemSubtotalColWidth = contentWidth * 0.23; // Was 0.22
   
   // No paddingBetweenCols needed if widths sum to contentWidth
 
@@ -146,13 +147,13 @@ export function generateInvoicePdf(
     doc.setFontSize(9); 
     doc.setFont('helvetica', 'bold');
 
-    doc.text('Product Name', colStartX.productName, yPos);
-    doc.text('SN/Barcode', colStartX.snBarcode, yPos);
+    doc.text('Product Name', colStartX.productName + 1, yPos); // Added small padding for left-aligned
+    doc.text('SN/Barcode', colStartX.snBarcode + 1, yPos); // Added small padding for left-aligned
     doc.text('Qty', colStartX.qty + qtyColWidth / 2, yPos, { align: 'center' }); 
-    doc.text('Price', colStartX.price + priceColWidth, yPos, { align: 'right' });
-    doc.text('Subtotal', colStartX.subtotal + itemSubtotalColWidth, yPos, { align: 'right' });
+    doc.text('Price', colStartX.price + priceColWidth - 1, yPos, { align: 'right' }); // Keep right alignment
+    doc.text('Subtotal', colStartX.subtotal + itemSubtotalColWidth - 1, yPos, { align: 'right' }); // Keep right alignment
     
-    doc.setFontSize(9); // Ensure font size is set before calling getLineHeight
+    doc.setFontSize(9); 
     yPos += doc.getLineHeight(); 
     yPos += 2; 
     doc.line(margin, yPos, pageWidth - margin, yPos); 
@@ -166,11 +167,11 @@ export function generateInvoicePdf(
   // --- Table Items ---
   doc.setFontSize(8); 
   order.items.forEach((item) => {
-    doc.setFontSize(8); // Ensure font size is set before calling getLineHeight
+    doc.setFontSize(8); 
     const itemLineHeight = doc.getLineHeight(); 
-    const productNameLines = doc.splitTextToSize(item.name, productColWidth - 2); // -2 for padding
+    const productNameLines = doc.splitTextToSize(item.name, productColWidth - 2); 
     const snBarcodeText = item.serialNumber || item.barcode || 'N/A';
-    const snBarcodeLines = doc.splitTextToSize(snBarcodeText, snBarcodeColWidth -2); // -2 for padding
+    const snBarcodeLines = doc.splitTextToSize(snBarcodeText, snBarcodeColWidth - 2); 
     const maxLinesPerItem = Math.max(productNameLines.length, snBarcodeLines.length, 1);
     const itemBlockHeight = maxLinesPerItem * itemLineHeight + 2; 
 
@@ -182,12 +183,13 @@ export function generateInvoicePdf(
     }
     const currentItemY = yPos;
 
-    doc.text(productNameLines, colStartX.productName + 1, currentItemY); // +1 for padding
-    doc.text(snBarcodeLines, colStartX.snBarcode + 1, currentItemY); // +1 for padding
+    doc.text(productNameLines, colStartX.productName + 1, currentItemY); 
+    doc.text(snBarcodeLines, colStartX.snBarcode + 1, currentItemY); 
 
     doc.text(item.billQuantity.toString(), colStartX.qty + qtyColWidth / 2, currentItemY, { align: 'center' }); 
-    doc.text(`₹${(item.price).toFixed(2)}`, colStartX.price + priceColWidth -1 , currentItemY, { align: 'right' });  // -1 for padding
-    doc.text(`₹${(item.price * item.billQuantity).toFixed(2)}`, colStartX.subtotal + itemSubtotalColWidth -1, currentItemY, { align: 'right' }); // -1 for padding
+    // Use Unicode for Rupee symbol and ensure correct alignment/padding
+    doc.text(`\u20B9${(item.price).toFixed(2)}`, colStartX.price + priceColWidth - 2 , currentItemY, { align: 'right' });  // Adjusted padding
+    doc.text(`\u20B9${(item.price * item.billQuantity).toFixed(2)}`, colStartX.subtotal + itemSubtotalColWidth - 2, currentItemY, { align: 'right' }); // Adjusted padding
     
     yPos += itemBlockHeight;
   });
@@ -201,7 +203,7 @@ export function generateInvoicePdf(
 
   yPos += 5; 
   const summaryLabelX = margin + contentWidth * 0.55; 
-  const summaryValueX = pageWidth - margin -1; // -1 for padding
+  const summaryValueX = pageWidth - margin - 2; // Adjusted padding for summary values
 
   doc.setLineWidth(0.1);
   doc.line(margin, yPos, pageWidth - margin, yPos); 
@@ -210,10 +212,10 @@ export function generateInvoicePdf(
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.text('Subtotal:', summaryLabelX, yPos, { align: 'left' });
-  doc.text(`₹${order.subtotal.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
+  doc.text(`\u20B9${order.subtotal.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
   yPos += 5;
   doc.text(`GST (${(taxRate * 100).toFixed(0)}%):`, summaryLabelX, yPos, { align: 'left' });
-  doc.text(`₹${order.taxAmount.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
+  doc.text(`\u20B9${order.taxAmount.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
   yPos += 5;
 
   doc.setFontSize(10); 
@@ -221,14 +223,14 @@ export function generateInvoicePdf(
   doc.line(summaryLabelX - 2 , yPos, pageWidth - margin, yPos); 
   yPos += 5;
   doc.text('Total Amount:', summaryLabelX, yPos, { align: 'left' });
-  doc.text(`₹${order.totalAmount.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
+  doc.text(`\u20B9${order.totalAmount.toFixed(2)}`, summaryValueX, yPos, { align: 'right' });
   yPos += 10; 
 
   // --- Footer ---
   const footerY = pageHeight - (margin / 2) - 3; 
   doc.setFontSize(7); 
   doc.setFont('helvetica', 'italic');
-  const pageCount = doc.internal.pages.length; // Correct way to get page count
+  const pageCount = doc.internal.pages.length; 
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.text(`Page ${i} of ${pageCount}`, margin, footerY, {align: 'left'});
