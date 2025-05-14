@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     console.log("AuthContext: Subscribing to onAuthStateChanged.");
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       console.log("AuthContext: onAuthStateChanged triggered. User:", user ? user.uid : null);
-      setIsLoading(true); // Set loading true at the start of auth state change processing
+      setIsLoading(true); 
       try {
         if (user) {
           setCurrentUser(user);
@@ -45,26 +45,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const usersCollectionRef = collection(db, 'users');
             const ownerQuery = query(usersCollectionRef, where('role', '==', 'owner'), limit(1));
             console.log("AuthContext: Querying for existing owner...");
-            
-            let ownerSnapshot;
-            try {
-              ownerSnapshot = await getDocs(ownerQuery);
-              console.log("AuthContext: Owner query snapshot empty:", ownerSnapshot.empty);
-            } catch (ownerQueryError) {
-              console.error("AuthContext: Error querying for owner:", ownerQueryError);
-              // Decide how to handle this - maybe default to 'employee' or rethrow if critical
-              // For now, let's assume if owner query fails, we can't determine if an owner exists,
-              // so we might default to employee or show an error.
-              // To prevent further errors, we'll clear user and set loading false.
-              setCurrentUser(null);
-              setUserProfile(null);
-              setIsLoading(false);
-              toast({ title: "Initialization Error", description: "Could not verify user roles. Please try again.", variant: "destructive" });
-              return; // Exit early
-            }
+            const ownerSnapshot = await getDocs(ownerQuery);
+            console.log("AuthContext: Owner query snapshot empty:", ownerSnapshot.empty);
 
-
-            let newRole: UserRole = 'employee';
+            let newRole: UserRole = 'employee'; 
             if (ownerSnapshot.empty) {
               newRole = 'owner';
               toast({
@@ -83,32 +67,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               console.log(`AuthContext: Assigning role 'employee' to ${user.uid}.`);
             }
             
-            try {
-                await createFirestoreUserProfile(
-                    user.uid,
-                    user.email,
-                    user.displayName,
-                    newRole,
-                    user.phoneNumber
-                );
-                console.log(`AuthContext: Profile creation attempt for ${user.uid} with role ${newRole} finished. Refetching profile...`);
-                profile = await getUserProfile(user.uid);
-                if (!profile) {
-                    console.error(`AuthContext: CRITICAL - Profile still null after creation for ${user.uid}`);
-                    // This is a critical failure, might indicate rules issues with creating/reading own profile
-                    toast({ title: "Profile Creation Failed", description: "Could not create or retrieve your user profile.", variant: "destructive" });
-                    // Potentially sign out the user or guide them
-                } else {
-                    console.log(`AuthContext: Profile created and refetched for ${user.uid}:`, JSON.stringify(profile));
-                }
-            } catch (profileCreationError) {
-                console.error(`AuthContext: Error creating profile for ${user.uid}:`, profileCreationError);
-                toast({ title: "Profile Setup Error", description: "Failed to set up your user profile.", variant: "destructive" });
-                // Clear states as profile setup failed
-                setCurrentUser(null);
-                setUserProfile(null);
-                setIsLoading(false);
-                return; // Exit early
+            await createFirestoreUserProfile(
+              user.uid,
+              user.email,
+              user.displayName,
+              newRole,
+              user.phoneNumber
+            );
+            console.log(`AuthContext: Profile creation attempt for ${user.uid} with role ${newRole} finished. Refetching profile...`);
+            profile = await getUserProfile(user.uid); 
+            if (!profile) {
+                console.error(`AuthContext: CRITICAL - Profile still null after creation for ${user.uid}`);
+            } else {
+                console.log(`AuthContext: Profile created and refetched for ${user.uid}:`, JSON.stringify(profile));
             }
           } else {
             console.log(`AuthContext: Profile found for ${user.uid}:`, JSON.stringify(profile));
@@ -122,8 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUserProfile(null);
         }
       } catch (error) {
-        console.error("AuthContext: General error during onAuthStateChanged logic:", error);
-        toast({ title: "Authentication Error", description: "An unexpected error occurred during authentication.", variant: "destructive" });
+        console.error("AuthContext: Error during onAuthStateChanged logic:", error);
         setCurrentUser(null); // Ensure states are cleared on error too
         setUserProfile(null);
       } finally {
@@ -137,21 +107,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       unsubscribe();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toast]); // router was removed as it wasn't used in this effect
+  }, [toast]);
 
   const logout = async () => {
-    setIsLoading(true); 
+    setIsLoading(true); // Optional: set loading true during logout process
     try {
       await firebaseSignOut(auth);
-      // onAuthStateChanged will handle setting currentUser and userProfile to null
+      // Auth state change (currentUser to null) will be handled by onAuthStateChanged
       router.push('/login');
+      // No need to manually set currentUser/userProfile to null here, onAuthStateChanged handles it.
       toast({ title: "Logged Out", description: "You have been successfully logged out." });
     } catch (error) {
       console.error("AuthProvider: Error signing out:", error);
       toast({ title: "Logout Failed", description: "Could not sign out. Please try again.", variant: "destructive" });
-      setIsLoading(false); // Ensure loading is false if logout fails before onAuthStateChanged triggers
+    } finally {
+        // setIsLoading(false); // onAuthStateChanged will set this once user becomes null
     }
-    // setIsLoading(false) is implicitly handled by onAuthStateChanged when user becomes null
   };
 
   return (
@@ -168,4 +139,3 @@ export const useAuthContext = (): AuthContextType => {
   }
   return context;
 };
-
