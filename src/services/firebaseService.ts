@@ -322,10 +322,7 @@ export const updateOrderAndAdjustStock = async (
   }
   
   // Prepare the order document update, keeping original orderNumber and orderDate
-  const finalOrderUpdateData: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'items'> & { 
-    items: OrderItemData[]; 
-    updatedAt: FieldValue 
-  } = {
+  const finalOrderUpdateData: Partial<Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt'>> & { updatedAt: FieldValue } = {
     customerId: updatedOrderPayload.customerId,
     customerName: updatedOrderPayload.customerName,
     customerMobile: updatedOrderPayload.customerMobile,
