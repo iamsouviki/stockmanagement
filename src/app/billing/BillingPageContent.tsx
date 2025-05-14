@@ -47,7 +47,7 @@ export default function BillingPageContent() {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (searchParams.toString() || (!searchParams.get('fromOrder') && !searchParams.get('intent'))) {
+    if (searchParams) { // Check if searchParams object exists
       setParamFromOrder(searchParams.get('fromOrder'));
       setParamIntent(searchParams.get('intent'));
       setAreParamsReady(true);
@@ -79,10 +79,18 @@ export default function BillingPageContent() {
   }, [fetchProductData]);
 
   useEffect(() => {
-    if (!areParamsReady) return; 
+    if (!areParamsReady || !paramFromOrder || availableProducts.length === 0) {
+        if (!paramFromOrder && areParamsReady) { // Reset if no order ID but params are ready
+            setOriginalOrderForEdit(null); 
+            setBillItems([]);
+            setSelectedCustomer(null);
+            setCustomerSearchTerm("");
+            setIsLoadingOrderData(false); // Ensure loading state is reset
+        }
+        return;
+    }
 
-    if (paramFromOrder && availableProducts.length > 0) {
-      const loadOrderData = async () => {
+    const loadOrderData = async () => {
         setIsLoadingOrderData(true);
         try {
           const order = await getOrderById(paramFromOrder);
@@ -90,30 +98,35 @@ export default function BillingPageContent() {
             if (paramIntent === 'edit') {
               setOriginalOrderForEdit(order); 
             }
-            const itemsForBill: BillItem[] = order.items.map(item => {
-              const productDetails = availableProducts.find(p => p.id === item.productId);
-              
-              const preliminaryImageUrl = productDetails?.imageUrl ?? item.imageUrl;
-              const finalImageUrl = preliminaryImageUrl === null ? undefined : preliminaryImageUrl;
+            const itemsForBill: BillItem[] = order.items.map(orderItem => {
+              const productDetails = availableProducts.find(p => p.id === orderItem.productId);
 
-              const preliminaryImageHint = productDetails?.imageHint ?? item.imageHint;
-              const finalImageHint = preliminaryImageHint === null ? undefined : preliminaryImageHint;
+              const resolvedImageUrl = productDetails?.imageUrl ?? orderItem.imageUrl;
+              const finalImageUrl = resolvedImageUrl === null ? undefined : resolvedImageUrl;
+
+              const resolvedImageHint = productDetails?.imageHint ?? orderItem.imageHint;
+              const finalImageHint = resolvedImageHint === null ? undefined : resolvedImageHint;
 
               return {
-                ...item, 
-                id: item.productId, 
-                name: productDetails?.name || item.name,
-                price: productDetails?.price || item.price,
-                quantity: productDetails?.quantity ?? 0, 
-                billQuantity: item.billQuantity, 
+                // Product fields:
+                id: orderItem.productId, 
+                name: productDetails?.name || orderItem.name,
+                serialNumber: orderItem.serialNumber || productDetails?.serialNumber || '', 
+                barcode: orderItem.barcode || productDetails?.barcode || '',       
+                price: productDetails?.price || orderItem.price,                     
+                quantity: productDetails?.quantity ?? 0,                           
                 categoryId: productDetails?.categoryId ?? '',
-                serialNumber: item.serialNumber || productDetails?.serialNumber || '',
-                barcode: item.barcode || productDetails?.barcode || '',
-                imageUrl: finalImageUrl,
-                imageHint: finalImageHint,
+                categoryName: productDetails?.categoryName,                        
+                imageUrl: finalImageUrl,                                           
+                imageHint: finalImageHint,                                         
+                createdAt: productDetails?.createdAt,                              
+                updatedAt: productDetails?.updatedAt,                              
+                // BillItem specific field:
+                billQuantity: orderItem.billQuantity,
               };
             });
             setBillItems(itemsForBill);
+
             if (order.customerId && order.customerId !== WALK_IN_CUSTOMER_ID) {
               const customer = await getCustomerById(order.customerId);
               setSelectedCustomer(customer);
@@ -135,13 +148,8 @@ export default function BillingPageContent() {
         setIsLoadingOrderData(false);
       };
       loadOrderData();
-    } else if (!paramFromOrder) { 
-      setOriginalOrderForEdit(null); 
-      setBillItems([]);
-      setSelectedCustomer(null);
-      setCustomerSearchTerm("");
-    }
-  }, [areParamsReady, paramFromOrder, paramIntent, availableProducts, router, toast]); 
+    // Add router to dependency array if it's used for navigation inside this effect
+  }, [areParamsReady, paramFromOrder, paramIntent, availableProducts, toast, router]);
 
 
   const handleProductAdd = (barcodeOrSn: string) => {
@@ -363,8 +371,8 @@ export default function BillingPageContent() {
       name: item.name,
       price: item.price,
       billQuantity: item.billQuantity,
-      imageUrl: item.imageUrl === undefined ? null : item.imageUrl, // Convert undefined back to null for DB
-      imageHint: item.imageHint === undefined ? null : item.imageHint, // Convert undefined back to null for DB
+      imageUrl: item.imageUrl === undefined ? null : item.imageUrl, 
+      imageHint: item.imageHint === undefined ? null : item.imageHint, 
       serialNumber: item.serialNumber || null,
       barcode: item.barcode || null,
     }));
@@ -402,7 +410,7 @@ export default function BillingPageContent() {
       let orderIdForResult: string;
       let orderNumberForResult: string | undefined;
 
-      if (paramIntent === 'edit' && paramFromOrder && originalOrderForEdit) {
+      if (areParamsReady && paramIntent === 'edit' && paramFromOrder && originalOrderForEdit) {
         orderIdForResult = await updateOrderAndAdjustStock(paramFromOrder, orderPayload, originalOrderForEdit);
         orderNumberForResult = originalOrderForEdit.orderNumber; 
          toast({
@@ -529,7 +537,7 @@ export default function BillingPageContent() {
                   </Button>
                 </div>
               )}
-               {!selectedCustomer && !customerSearchTerm && !searchedMobileForNotFound && !(paramIntent === 'edit' && originalOrderForEdit?.customerId && originalOrderForEdit.customerName !== "Walk-in Customer" ) && (
+               {!selectedCustomer && !customerSearchTerm && !searchedMobileForNotFound && !(areParamsReady && paramIntent === 'edit' && originalOrderForEdit?.customerId && originalOrderForEdit.customerName !== "Walk-in Customer" ) && (
                  <Alert variant="default" className="border-primary/50 text-primary bg-primary/5">
                     <Info className="h-5 w-5 !text-primary" />
                     <AlertTitle className="font-semibold">Tip</AlertTitle>
@@ -538,7 +546,7 @@ export default function BillingPageContent() {
                     </AlertDescription>
                 </Alert>
                )}
-                 {paramIntent === 'edit' && originalOrderForEdit && originalOrderForEdit.customerName !== "Walk-in Customer" && !selectedCustomer && areParamsReady && (
+                 {areParamsReady && paramIntent === 'edit' && originalOrderForEdit && originalOrderForEdit.customerName !== "Walk-in Customer" && !selectedCustomer && (
                     <Alert variant="default" className="border-accent text-accent bg-accent/10">
                         <Info className="h-5 w-5 !text-accent" />
                         <AlertTitle className="font-semibold">Editing Order for: {originalOrderForEdit.customerName}</AlertTitle>
@@ -592,7 +600,3 @@ export default function BillingPageContent() {
     </div>
   );
 }
-
-    
-
-    

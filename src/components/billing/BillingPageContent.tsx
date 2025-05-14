@@ -86,8 +86,8 @@ export default function BillingPageContent() {
                 categoryId: productDetails?.categoryId ?? '',
                 serialNumber: item.serialNumber || productDetails?.serialNumber || '',
                 barcode: item.barcode || productDetails?.barcode || '',
-                imageUrl: productDetails?.imageUrl || item.imageUrl,
-                imageHint: productDetails?.imageHint || item.imageHint,
+                imageUrl: productDetails?.imageUrl || item.imageUrl || '',
+                imageHint: productDetails?.imageHint || item.imageHint || '',
               };
             });
             setBillItems(itemsForBill);
