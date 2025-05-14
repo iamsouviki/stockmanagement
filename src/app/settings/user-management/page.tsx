@@ -25,6 +25,8 @@ import Link from "next/link";
 const allowedAccessRoles: UserRole[] = ['owner', 'admin'];
 
 export default function UserManagementPage() {
+  console.log("UserManagementPage rendering or attempting to render."); // Added for debugging
+
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
@@ -63,11 +65,6 @@ export default function UserManagementPage() {
         toast({ title: "Action Not Allowed", description: "Owner accounts cannot be modified from this panel.", variant: "default" });
         return;
     }
-    // The following check was redundant and caused the TypeScript build error:
-    // if (currentUserProfile?.role === 'admin' && user.role === 'owner') { 
-    //     toast({ title: "Permission Denied", description: "Admins cannot edit owner accounts.", variant: "destructive" });
-    //     return;
-    // }
     setEditingUser(user);
     setIsDialogOpen(true);
   };
@@ -107,38 +104,25 @@ export default function UserManagementPage() {
   const handleSubmitUser = async (data: UserManagementFormData) => {
     try {
       if (editingUser) { 
-        // `editingUser` here will not be the current user and will not have 'owner' role due to guards in `handleEditUser`.
-        
-        // Permissions for Admin
         if (currentUserProfile?.role === 'admin') {
-            // editingUser.role here is 'admin' (not self) or 'employee'.
             if (editingUser.role === 'admin' && data.role === 'admin') {
-                // Admin editing another Admin's details (no role change) - OK
             } else if (editingUser.role === 'admin' && data.role === 'employee') {
-                // Admin demoting another Admin to Employee - OK
             } else if (editingUser.role === 'employee' && data.role === 'employee') {
-                // Admin editing an Employee's details (no role change) - OK
             } else if (editingUser.role === 'employee' && data.role === 'admin') {
-                // Admin trying to promote Employee to Admin - NOT ALLOWED
                 toast({ title: "Permission Denied", description: "Admins cannot promote Employees to Admin.", variant: "destructive" });
                 return;
             } else { 
-                // Other invalid scenarios for Admin (e.g., trying to set role to 'owner')
                 toast({ title: "Permission Denied", description: "Admins can only demote other Admins to Employee, or manage Employee accounts. Cannot assign 'owner' role.", variant: "destructive" });
                 return;
             }
         }
         
-        // Permissions for Owner
         if (currentUserProfile?.role === 'owner') {
-            // editingUser.role here is 'admin' or 'employee'.
             if ((editingUser.role === 'admin' || editingUser.role === 'employee') && (data.role === 'admin' || data.role === 'employee') ) {
-                // Owner changing Admin to Employee or vice-versa, or keeping same - OK
             } else if (data.role === 'owner') { 
                  toast({ title: "Action Not Allowed", description: "Cannot assign Owner role via edit. This is a restricted operation.", variant: "destructive"});
                  return;
             }
-            // Any other case should be fine for an owner editing an admin/employee.
         }
 
         await updateUserProfile(editingUser.id, {
@@ -152,7 +136,6 @@ export default function UserManagementPage() {
           description: `User "${data.displayName}" has been successfully updated.`,
         });
       } else { 
-        // Adding new user
         if (!data.email || !data.password) {
           toast({ title: "Missing Fields", description: "Email and password are required for new users.", variant: "destructive" });
           return;
@@ -257,4 +240,3 @@ export default function UserManagementPage() {
     </AuthGuard>
   );
 }
-
