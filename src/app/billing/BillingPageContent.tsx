@@ -105,16 +105,16 @@ export default function BillingPageContent() {
               const productDetails = availableProducts.find(p => p.id === item.productId);
               return {
                 ...item,
-                id: item.productId,
+                id: item.productId, // Ensure BillItem's own id is set (from product.id)
                 name: productDetails?.name || item.name,
                 price: productDetails?.price || item.price,
-                quantity: productDetails?.quantity ?? 0, 
-                billQuantity: item.billQuantity, 
+                quantity: productDetails?.quantity ?? 0, // Stock quantity from Product
+                billQuantity: item.billQuantity, // Quantity being billed
                 categoryId: productDetails?.categoryId ?? '',
                 serialNumber: item.serialNumber || productDetails?.serialNumber || '',
-                barcode: productDetails?.barcode || item.barcode,
-                imageUrl: productDetails?.imageUrl || item.imageUrl,
-                imageHint: productDetails?.imageHint || item.imageHint,
+                barcode: item.barcode || productDetails?.barcode || '',
+                imageUrl: (productDetails?.imageUrl || item.imageUrl) ?? undefined,
+                imageHint: (productDetails?.imageHint || item.imageHint) ?? undefined,
               };
             });
             setBillItems(itemsForBill);

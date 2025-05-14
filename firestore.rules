@@ -1,19 +1,93 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // This rule allows anyone with your Firestore database reference to view, edit,
-    // and delete all data in your Firestore database. It is useful for getting
-    // started, but it is configured to expire after 30 days because it
-    // leaves your app open to attackers. At that time, all client
-    // requests to your Firestore database will be denied.
-    //
-    // Make sure to write security rules for your app before that time, or else
-    // all client requests to your Firestore database will be denied until you Update
-    // your rules
-    match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2025, 6, 12);
+    // Helper functions to check user roles
+    function getUserRole(userId) {
+      // Check if the user document exists before trying to access .data.role
+      return exists(/databases/$(database)/documents/users/$(userId)) ? 
+             get(/databases/$(database)/documents/users/$(userId)).data.role : null;
+    }
+
+    function isOwner() {
+      return request.auth != null && getUserRole(request.auth.uid) == 'owner';
+    }
+
+    function isAdmin() {
+      return request.auth != null && getUserRole(request.auth.uid) == 'admin';
+    }
+
+    function isEmployee() {
+      return request.auth != null && getUserRole(request.auth.uid) == 'employee';
+    }
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Any authenticated user can read any user profile.
+      // This is necessary for:
+      // 1. AuthContext to query for an existing owner during initial sign-in/profile creation.
+      // 2. UserManagementPage to list users for admins/owners.
+      // 3. Displaying user names/details in other parts of the app if needed.
+      allow read: if isAuthenticated(); 
+      
+      // Owners or Admins can list all user documents.
+      allow list: if isOwner() || isAdmin();
+      
+      // A user can create their own profile document.
+      // The client-side logic in AuthContext determines the initial role.
+      allow create: if request.auth.uid == userId;
+      
+      // Update rules:
+      // 1. A user can update their own profile, but cannot change their own role directly via this rule.
+      // 2. An owner can update any other user's profile (including their role).
+      // 3. An admin can update other users if those users are not owners, and the admin is not trying to make them an owner.
+      allow update: if isAuthenticated() && (
+          (request.auth.uid == userId && !(request.resource.data.role != resource.data.role)) || // User updates own, no role change
+          (isOwner() && request.auth.uid != userId) || 
+          (isAdmin() && request.auth.uid != userId && getUserRole(userId) != 'owner' && request.resource.data.role != 'owner')
+      );
+                      
+      // Delete rules:
+      // 1. An owner can delete any other user.
+      // 2. An admin can delete employees (but not other admins or owners).
+      // Users cannot delete themselves directly through this rule.
+      allow delete: if isAuthenticated() && (
+        (isOwner() && request.auth.uid != userId) ||
+        (isAdmin() && getUserRole(userId) == 'employee' && request.auth.uid != userId )
+      );
+    }
+
+    // Categories Collection
+    match /categories/{categoryId} {
+      allow read, list: if isAuthenticated();
+      allow create, update, delete: if isOwner() || isAdmin() || isEmployee();
+    }
+
+    // Products Collection
+    match /products/{productId} {
+      allow read, list: if isAuthenticated();
+      allow create, update, delete: if isOwner() || isAdmin() || isEmployee();
+    }
+
+    // Customers Collection
+    match /customers/{customerId} {
+      allow read, list: if isAuthenticated();
+      allow create, update: if isOwner() || isAdmin() || isEmployee();
+      allow delete: if isOwner() || isAdmin();
+    }
+
+    // Orders Collection
+    match /orders/{orderId} {
+      allow read, list: if isAuthenticated();
+      allow create: if isOwner() || isAdmin() || isEmployee(); // Billing
+      allow update: if isOwner(); // Only owner can edit existing orders
+      allow delete: if false; // Generally, orders should not be deleted. Set to isOwner() if deletion is truly needed.
     }
   }
 }
