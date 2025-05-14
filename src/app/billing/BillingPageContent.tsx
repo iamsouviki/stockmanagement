@@ -380,7 +380,7 @@ export default function BillingPageContent() {
     let customerId = WALK_IN_CUSTOMER_ID;
     let customerName = "Walk-in Customer";
     let customerMobile = searchedMobileForNotFound || "N/A"; 
-    let customerAddress = null;
+    let customerAddress: string | null = null;
 
     if (selectedCustomer) {
       customerId = selectedCustomer.id;
