@@ -1,11 +1,11 @@
 import type { StoreDetails } from '@/types';
 
 export const storeDetails: StoreDetails = {
-  name: "PAS Trading CO",
-  address: "456 Tech Park Road, Bangalore, KA 560001, India",
-  logoUrl: "", // Set to empty or a generic text placeholder if used elsewhere
-  logoHint: "company text logo", // Updated hint
-  contact: "Phone: +91 98765 43210 | Email: sales@stockpilot.co.in", // Consider updating email if needed
+  name: "PAS TRADING COMPUTER",
+  address: "Station Rd,Circus Maidan, Katwa, West Bengal 713130",
+  logoUrl: "https://lh3.googleusercontent.com/p/AF1QipNdwGCFX77eqHHieGmU5-CF7TT1ZNzkXIAC-Vay=s680-w680-h510-rw", 
+  logoHint: "company text logo",
+  contact: "Phone: +91 098309 63008 | Email: pastrading@gmail.com",
   storeType: "Electronics & Gadgets Retail",
-  gstNo: "29ABCDE1234F1Z5", // Example Indian GSTIN format
+  gstNo: "29ABCDE1234F1Z5",
 };

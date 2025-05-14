@@ -1,3 +1,4 @@
+import { storeDetails } from '@/config/storeDetails';
 import type { SVGProps } from 'react';
 
 const Logo = (props: SVGProps<SVGSVGElement>) => (
@@ -15,11 +16,11 @@ const Logo = (props: SVGProps<SVGSVGElement>) => (
       x="0" // Start text from the left edge of the viewBox
       y="35" // Adjusted for vertical centering; depends on font and viewBox
       fontFamily="var(--font-geist-sans), Arial, sans-serif"
-      fontSize="26" // Adjusted font size
+      fontSize="18" // Adjusted font size
       fontWeight="bold"
       fill="hsl(var(--primary-foreground))" // Ensure text is visible on primary background
     >
-      PAS Trading CO
+      {storeDetails.name}
     </text>
   </svg>
 );

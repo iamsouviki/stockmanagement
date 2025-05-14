@@ -4,6 +4,7 @@ import './globals.css';
 import Header from '@/components/layout/Header';
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/contexts/AuthContext'; // Import AuthProvider
+import { storeDetails } from '@/config/storeDetails';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -16,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'PAS Trading CO - Electronics Stock Management',
+  title: storeDetails.name+" - "+storeDetails.storeType,
   description: 'Manage your electronics store stock efficiently with PAS Trading CO.',
 };
 
