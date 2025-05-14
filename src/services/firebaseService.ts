@@ -122,7 +122,7 @@ export const findCategoryByNameOrCreate = async (name: string): Promise<Category
 
 
 // Products Service
-export const getProducts = async (): Promise<Product[]> => {
+export const getProducts = async (): Promise<Product[]> => { 
   const { data } = await getCollection<Product>('products', 'name');
   return data;
 }
@@ -193,8 +193,6 @@ export const findCustomerByMobile = async (mobileNumber: string): Promise<Custom
 
 
 // Orders Service
-
-// Function to get all orders (for dashboard charts)
 export const getOrders = async (): Promise<Order[]> => {
     const { data } = await getCollection<Order>('orders', 'orderDate', 'desc');
     return data;
@@ -227,13 +225,13 @@ export const addOrderAndDecrementStock = async (
   const batch = writeBatch(db);
   const now = new Date();
   const orderNumber = `ORD-${format(now, 'yyyyMMdd-HHmmssSSS')}`;
-
-  const completeOrderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> & {
-    orderDate: Timestamp;
-    createdAt: FieldValue;
-    updatedAt: FieldValue;
-  } = {
-    ...orderData,
+  
+  const completeOrderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> & { 
+    orderDate: Timestamp; 
+    createdAt: FieldValue; 
+    updatedAt: FieldValue; 
+  } = { 
+    ...orderData, 
     orderNumber,
     orderDate: Timestamp.fromDate(now),
     createdAt: serverTimestamp(),
@@ -293,7 +291,7 @@ export const updateOrderAndAdjustStock = async (
       if (productSnap.exists()) {
         const currentDBStock = productSnap.data().quantity || 0;
         const newDBStock = currentDBStock + netStockChangeToApply;
-
+        
         if (newDBStock < 0) {
           throw new Error(
             `Insufficient stock for product '${productSnap.data().name || productId}'. ` +
@@ -311,7 +309,7 @@ export const updateOrderAndAdjustStock = async (
       }
     } catch (error) {
       console.error(`Error preparing stock update for product ${productId}:`, error);
-      throw error;
+      throw error; 
     }
   });
 
@@ -329,6 +327,9 @@ export const updateOrderAndAdjustStock = async (
     // customerMobile: originalOrder.customerMobile,
     // customerAddress: originalOrder.customerAddress,
 
+  // Ensure only allowed fields are updated and 'updatedAt' is handled correctly
+  // The type here makes sure 'updatedAt' is FieldValue, and other fields match what updatedOrderPayload provides
+  const finalOrderUpdateData: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'> & { updatedAt: FieldValue } = {
     customerId: updatedOrderPayload.customerId,
     customerName: updatedOrderPayload.customerName,
     customerMobile: updatedOrderPayload.customerMobile,
@@ -346,3 +347,4 @@ export const updateOrderAndAdjustStock = async (
   console.log("--- updateOrderAndAdjustStock END --- Order update batch committed successfully.");
   return orderId;
 };
+
