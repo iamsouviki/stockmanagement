@@ -18,11 +18,12 @@ import {
   startAfter,
   type FieldPath,
   type OrderByDirection,
+  type DocumentSnapshot,
   type QueryDocumentSnapshot,
   endBefore,
   limitToLast,
   type FieldValue,
-  type DocumentData, 
+  type DocumentData, // Added for clarity
 } from 'firebase/firestore';
 import type { Product, Customer, Category, Order, OrderItemData } from '@/types';
 import { WALK_IN_CUSTOMER_ID } from '@/types';
@@ -33,9 +34,9 @@ const getCollection = async <T extends {id: string}>(
   collectionName: string,
   orderByField?: Extract<keyof T, string> | FieldPath,
   orderDirection: OrderByDirection = 'asc',
-  pageLimit?: number, 
-  startAfterDoc?: QueryDocumentSnapshot | null, 
-  endBeforeDoc?: QueryDocumentSnapshot | null 
+  pageLimit?: number, // Optional: if not provided, fetches all
+  startAfterDoc?: QueryDocumentSnapshot | null, // For 'next' page
+  endBeforeDoc?: QueryDocumentSnapshot | null // For 'prev' page
 ): Promise<{ data: T[], firstDoc: QueryDocumentSnapshot | null, lastDoc: QueryDocumentSnapshot | null }> => {
   let q = query(collection(db, collectionName));
   if (orderByField) {
@@ -46,11 +47,13 @@ const getCollection = async <T extends {id: string}>(
     if (startAfterDoc) {
       q = query(q, startAfter(startAfterDoc), limit(pageLimit));
     } else if (endBeforeDoc) {
+      // Firestore's endBefore needs limitToLast to work as expected for previous page
       q = query(q, endBefore(endBeforeDoc), limitToLast(pageLimit));
     } else {
       q = query(q, limit(pageLimit));
     }
   }
+  // If no pageLimit, all docs are fetched (existing behavior for non-paginated lists)
 
   const snapshot = await getDocs(q);
   const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
@@ -190,6 +193,8 @@ export const findCustomerByMobile = async (mobileNumber: string): Promise<Custom
 
 
 // Orders Service
+
+// Function to get all orders (for dashboard charts)
 export const getOrders = async (): Promise<Order[]> => {
     const { data } = await getCollection<Order>('orders', 'orderDate', 'desc');
     return data;
@@ -223,16 +228,16 @@ export const addOrderAndDecrementStock = async (
   const now = new Date();
   const orderNumber = `ORD-${format(now, 'yyyyMMdd-HHmmssSSS')}`;
 
-  const completeOrderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> & { 
-    orderDate: Timestamp; 
-    createdAt: FieldValue; 
-    updatedAt: FieldValue; 
+  const completeOrderData: Omit<Order, 'id' | 'createdAt' | 'updatedAt'> & {
+    orderDate: Timestamp;
+    createdAt: FieldValue;
+    updatedAt: FieldValue;
   } = {
     ...orderData,
     orderNumber,
     orderDate: Timestamp.fromDate(now),
-    createdAt: serverTimestamp(), 
-    updatedAt: serverTimestamp(), 
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
   };
 
   const newOrderRef = doc(collection(db, 'orders'));
@@ -263,27 +268,24 @@ export const updateOrderAndAdjustStock = async (
   updatedOrderPayload: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'>,
   originalOrder: Order
 ): Promise<string> => {
+  console.log("--- updateOrderAndAdjustStock START ---");
+  console.log("Order ID to Update:", orderId);
+
   const batch = writeBatch(db);
   const orderRef = doc(db, 'orders', orderId);
 
   const stockAdjustments = new Map<string, number>();
 
-  // Calculate how much each item from original order contributed to being "billed"
-  originalOrder.items.forEach(originalItem => {
-    stockAdjustments.set(originalItem.productId, (stockAdjustments.get(originalItem.productId) || 0) + originalItem.billQuantity);
+  originalOrder.items.forEach(item => {
+    stockAdjustments.set(item.productId, (stockAdjustments.get(item.productId) || 0) + item.billQuantity);
   });
 
-  // Calculate how much each item from updated order will be "billed"
-  updatedOrderPayload.items.forEach(updatedItem => {
-    stockAdjustments.set(updatedItem.productId, (stockAdjustments.get(updatedItem.productId) || 0) - updatedItem.billQuantity);
+  updatedOrderPayload.items.forEach(item => {
+    stockAdjustments.set(item.productId, (stockAdjustments.get(item.productId) || 0) - item.billQuantity);
   });
-  
-  // stockAdjustments now holds the *net change* to apply to product stock.
-  // Positive value means stock should increase (item returned/quantity reduced).
-  // Negative value means stock should decrease (item added/quantity increased).
 
   const productUpdatePromises = Array.from(stockAdjustments.entries()).map(async ([productId, netStockChangeToApply]) => {
-    if (netStockChangeToApply === 0) return; // No change for this product's stock
+    if (netStockChangeToApply === 0) return;
 
     const productRef = doc(db, 'products', productId);
     try {
@@ -295,34 +297,38 @@ export const updateOrderAndAdjustStock = async (
         if (newDBStock < 0) {
           throw new Error(
             `Insufficient stock for product '${productSnap.data().name || productId}'. ` +
-            `Current DB stock is ${currentDBStock}. Order edit requires ${-netStockChangeToApply} more units than available.`
+            `Attempting to set stock to ${newDBStock}. ` +
+            `Current DB stock is ${currentDBStock}. Order edit requires change of ${-netStockChangeToApply} to billed quantity.`
           );
         }
         batch.update(productRef, { quantity: newDBStock, updatedAt: serverTimestamp() });
       } else {
-        // This case should ideally not happen if products are managed correctly.
-        // If netStockChangeToApply > 0, it means returning stock for a product that doesn't exist.
-        // If netStockChangeToApply < 0, it means taking stock for a product that doesn't exist.
-        console.warn(`Product ID ${productId} not found during stock adjustment for order update. Stock change of ${netStockChangeToApply} ignored.`);
-        if (netStockChangeToApply < 0) { // Trying to decrement stock for a non-existent product
-            throw new Error(`Cannot fulfill order: Product ID ${productId} not found in inventory.`);
+        if (netStockChangeToApply > 0) {
+             console.warn(`Product ID ${productId} not found. Order update implies returning ${netStockChangeToApply} units. Stock cannot be returned.`);
+        } else {
+             throw new Error(`Product ID ${productId} not found. Cannot take stock for non-existent product during order update.`);
         }
       }
     } catch (error) {
       console.error(`Error preparing stock update for product ${productId}:`, error);
-      throw error; // Re-throw to halt the batch commit if critical
+      throw error;
     }
   });
 
   try {
-    await Promise.all(productUpdatePromises); // Validate all stock changes before committing
+    await Promise.all(productUpdatePromises);
   } catch (error) {
     console.error("Failed during product stock validation for update:", error);
-    throw error; // Halt if any product stock adjustment fails
+    throw error;
   }
   
-  // Prepare the order document update, keeping original orderNumber and orderDate
-  const finalOrderUpdateData: Partial<Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt'>> & { updatedAt: FieldValue } = {
+  const finalOrderUpdateData: Omit<Order, 'id' | 'orderNumber' | 'orderDate' | 'createdAt' | 'updatedAt'> & { updatedAt: FieldValue } = {
+    // Retain original orderNumber and orderDate unless they are part of updatedOrderPayload
+    // customerId: originalOrder.customerId, // Keep original if not changed
+    // customerName: originalOrder.customerName, 
+    // customerMobile: originalOrder.customerMobile,
+    // customerAddress: originalOrder.customerAddress,
+
     customerId: updatedOrderPayload.customerId,
     customerName: updatedOrderPayload.customerName,
     customerMobile: updatedOrderPayload.customerMobile,
@@ -337,6 +343,6 @@ export const updateOrderAndAdjustStock = async (
   batch.update(orderRef, finalOrderUpdateData);
 
   await batch.commit();
+  console.log("--- updateOrderAndAdjustStock END --- Order update batch committed successfully.");
   return orderId;
 };
-

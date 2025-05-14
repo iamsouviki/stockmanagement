@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useRouter } 
+import { useRouter } // Removed useParams as orderId is passed as prop
 from 'next/navigation';
 import type { Order, UserRole } from '@/types';
 import { getOrder } from '@/services/firebaseService';
@@ -258,4 +258,3 @@ export default function OrderDetailPageClient({ orderId }: OrderDetailPageClient
     </AuthGuard>
   );
 }
-

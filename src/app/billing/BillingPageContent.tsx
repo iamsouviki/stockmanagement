@@ -22,7 +22,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import BillingPageLoadingSkeleton from '@/components/billing/BillingPageLoadingSkeleton';
 import { generateInvoicePdf } from '@/lib/pdfGenerator'; 
-import type { Timestamp } from 'firebase/firestore';
 
 export default function BillingPageContent() {
   const router = useRouter();
@@ -48,7 +47,7 @@ export default function BillingPageContent() {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (searchParams) { 
+    if (searchParams) { // Check if searchParams object exists
       setParamFromOrder(searchParams.get('fromOrder'));
       setParamIntent(searchParams.get('intent'));
       setAreParamsReady(true);
@@ -81,12 +80,12 @@ export default function BillingPageContent() {
 
   useEffect(() => {
     if (!areParamsReady || !paramFromOrder || availableProducts.length === 0) {
-        if (!paramFromOrder && areParamsReady) { 
+        if (!paramFromOrder && areParamsReady) { // Reset if no order ID but params are ready
             setOriginalOrderForEdit(null); 
             setBillItems([]);
             setSelectedCustomer(null);
             setCustomerSearchTerm("");
-            setIsLoadingOrderData(false);
+            setIsLoadingOrderData(false); // Ensure loading state is reset
         }
         return;
     }
@@ -101,14 +100,15 @@ export default function BillingPageContent() {
             }
             const itemsForBill: BillItem[] = order.items.map(orderItem => {
               const productDetails = availableProducts.find(p => p.id === orderItem.productId);
-              
-              const preliminaryImageUrl = productDetails?.imageUrl ?? orderItem.imageUrl;
-              const finalImageUrl = preliminaryImageUrl === null ? undefined : preliminaryImageUrl;
 
-              const preliminaryImageHint = productDetails?.imageHint ?? orderItem.imageHint;
-              const finalImageHint = preliminaryImageHint === null ? undefined : preliminaryImageHint;
+              const resolvedImageUrl = productDetails?.imageUrl ?? orderItem.imageUrl;
+              const finalImageUrl = resolvedImageUrl === null ? undefined : resolvedImageUrl;
+
+              const resolvedImageHint = productDetails?.imageHint ?? orderItem.imageHint;
+              const finalImageHint = resolvedImageHint === null ? undefined : resolvedImageHint;
 
               return {
+                // Product fields:
                 id: orderItem.productId, 
                 name: productDetails?.name || orderItem.name,
                 serialNumber: orderItem.serialNumber || productDetails?.serialNumber || '', 
@@ -121,6 +121,7 @@ export default function BillingPageContent() {
                 imageHint: finalImageHint,                                         
                 createdAt: productDetails?.createdAt,                              
                 updatedAt: productDetails?.updatedAt,                              
+                // BillItem specific field:
                 billQuantity: orderItem.billQuantity,
               };
             });
@@ -147,6 +148,7 @@ export default function BillingPageContent() {
         setIsLoadingOrderData(false);
       };
       loadOrderData();
+    // Add router to dependency array if it's used for navigation inside this effect
   }, [areParamsReady, paramFromOrder, paramIntent, availableProducts, toast, router]);
 
 
@@ -325,8 +327,6 @@ export default function BillingPageContent() {
       const newCustomerEntry: Customer = {
         ...customerData,
         id: newCustomerId,
-        createdAt: undefined, // Will be set by server
-        updatedAt: undefined, // Will be set by server
       };
 
       handleSelectCustomer(newCustomerEntry);
@@ -388,7 +388,6 @@ export default function BillingPageContent() {
       customerMobile = selectedCustomer.mobileNumber;
       customerAddress = selectedCustomer.address || null;
     } else if (paramIntent === 'edit' && originalOrderForEdit && originalOrderForEdit.customerName !== "Walk-in Customer") {
-      // Retain original customer if not changed during edit
       customerId = originalOrderForEdit.customerId;
       customerName = originalOrderForEdit.customerName;
       customerMobile = originalOrderForEdit.customerMobile;
@@ -517,7 +516,7 @@ export default function BillingPageContent() {
                   aria-label="Search customer mobile number"
                 />
                 <Button onClick={() => handleSearchCustomer()} disabled={isSearchingCustomer} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
-                  <UserSearch className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> {isSearchingCustomer ? <Loader2 className="animate-spin"/> : "Search"}
+                  <UserSearch className="mr-2 h-4 w-4 sm:h-5 sm:w-5" /> {isSearchingCustomer ? "Searching..." : "Search"}
                 </Button>
               </div>
               {foundCustomers.length > 0 && (
@@ -601,4 +600,3 @@ export default function BillingPageContent() {
     </div>
   );
 }
-
