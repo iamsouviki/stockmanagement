@@ -4,68 +4,69 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users Collection
-    // - Authenticated users can read their own profile.
-    // - Authenticated users can list/query users (needed for AuthContext owner check, can be tightened later if necessary).
-    // - Only users themselves can create their profile (typically done once).
-    // - Users can update their own profile (e.g., displayName, mobileNumber).
-    // - Only owners can delete user profiles (Firestore profile only, Auth account deletion is separate).
-    // - Role changes are restricted.
+    // Helper function to get the role of the currently authenticated user
+    function getUserRole(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.role;
+    }
+
+    // Users collection
+    // - Users can read their own profile.
+    // - Users can create their own profile document upon signup (AuthContext handles this).
+    // - Users can update their own non-sensitive profile data (e.g., displayName, mobileNumber).
+    // - Only 'owner' can update another user's role (or other sensitive data).
+    // - Only 'owner' can delete users (except themselves or other owners).
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId && !(request.resource.data.role is string && request.resource.data.role != resource.data.role); // User cannot change their own role
-      allow delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner' && request.auth.uid != userId;
+      allow read: if request.auth != null && (request.auth.uid == userId || getUserRole(request.auth.uid) == 'owner' || getUserRole(request.auth.uid) == 'admin');
+      allow create: if request.auth != null && request.auth.uid == userId; // User creating their own profile doc
+      allow update: if request.auth != null &&
+                       ( (request.auth.uid == userId && !( 'role' in request.resource.data && request.resource.data.role != resource.data.role ) ) || // User updates own, but not role
+                         (getUserRole(request.auth.uid) == 'owner' && userId != request.auth.uid && resource.data.role != 'owner') || // Owner updates others (not owner)
+                         (getUserRole(request.auth.uid) == 'admin' && userId != request.auth.uid && resource.data.role == 'employee' && request.resource.data.role == 'employee') // Admin updates employee (no role change)
+                       );
+      allow delete: if request.auth != null &&
+                       getUserRole(request.auth.uid) == 'owner' &&
+                       userId != request.auth.uid && resource.data.role != 'owner'; // Owner can delete non-owner users
     }
 
-    // Function to check if the acting user has a specific role or is an owner
-    function hasRole(roles) {
-      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in roles;
-    }
-    function isOwner() {
-      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
-    }
-    function isAdmin() {
-      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-    function isEmployee() {
-      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'employee';
+    // Allows authenticated users to query the users collection (e.g., for AuthContext owner check)
+    match /users/{document=**} {
+      allow list: if request.auth != null;
     }
 
-    // Categories Collection
+    // Categories collection
     // - Authenticated users can read categories.
-    // - Owners, Admins, and Employees can write (create, update, delete) categories.
+    // - 'owner', 'admin', 'employee' can create, update, delete categories.
     match /categories/{categoryId} {
       allow read: if request.auth != null;
-      allow write: if hasRole(['owner', 'admin', 'employee']);
+      allow write: if request.auth != null && getUserRole(request.auth.uid) in ['owner', 'admin', 'employee'];
     }
 
-    // Products Collection
+    // Products collection
     // - Authenticated users can read products.
-    // - Owners, Admins, and Employees can write products.
+    // - 'owner', 'admin', 'employee' can create, update, delete products.
     match /products/{productId} {
       allow read: if request.auth != null;
-      allow write: if hasRole(['owner', 'admin', 'employee']);
+      allow write: if request.auth != null && getUserRole(request.auth.uid) in ['owner', 'admin', 'employee'];
     }
 
-    // Customers Collection
+    // Customers collection
     // - Authenticated users can read customers.
-    // - Owners, Admins, and Employees can write customers.
+    // - 'owner', 'admin', 'employee' can create, update, delete customers.
     match /customers/{customerId} {
       allow read: if request.auth != null;
-      allow write: if hasRole(['owner', 'admin', 'employee']);
+      allow write: if request.auth != null && getUserRole(request.auth.uid) in ['owner', 'admin', 'employee'];
     }
 
-    // Orders Collection
-    // - Authenticated users can read orders (for their history or general listing).
-    // - Owners, Admins, and Employees can create orders.
-    // - Only Owners can update orders.
-    // - Deletion of orders is generally disallowed (set to 'false' for safety, can be changed to owner-only if needed).
+    // Orders collection
+    // - Authenticated users can read orders.
+    // - 'owner', 'admin', 'employee' can create orders.
+    // - Only 'owner' can update orders.
+    // - Deletion of orders is generally restricted (set to false, can be changed if needed).
     match /orders/{orderId} {
       allow read: if request.auth != null;
-      allow create: if hasRole(['owner', 'admin', 'employee']);
-      allow update: if isOwner();
-      allow delete: if isOwner(); // Or set to false if deletion should be disallowed
+      allow create: if request.auth != null && getUserRole(request.auth.uid) in ['owner', 'admin', 'employee'];
+      allow update: if request.auth != null && getUserRole(request.auth.uid) == 'owner';
+      allow delete: if request.auth != null && getUserRole(request.auth.uid) == 'owner'; // Or set to false if deletion is not allowed
     }
   }
 }
