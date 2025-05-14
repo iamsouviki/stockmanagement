@@ -1,5 +1,4 @@
 // src/actions/exportActions.ts
-'use server';
 
 import { getOrders } from '@/services/firebaseService';
 import type { Order } from '@/types';
